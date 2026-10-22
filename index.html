@@ -6,201 +6,298 @@
 <title>고장보고서 생성기 (휴대폰 단독실행)</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#d9650b">
+<meta name="theme-color" content="#0f3a5c">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="고장보고서">
 <style>:root{
-  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eceff3; --surface-3:#e3e7ee;
-  --fg:#17202c; --fg-muted:#5c6679; --fg-faint:#8893a3;
-  --border:#d9dee6; --border-strong:#c3cad6;
-  --accent:#d9650b; --accent-fg:#ffffff; --accent-soft:#fcecdc; --accent-soft-fg:#8a3c06;
-  --ok:#1a7a42; --ok-soft:#e3f5e9;
-  --warn:#9a5b06; --warn-soft:#fdf0d9;
-  --danger:#b4231f; --danger-soft:#fbe5e4;
-  --focus:#1c4ed8;
+  --bg:#eef1f5; --surface:#ffffff; --surface-alt:#e6eaf0; --surface-sunk:#dde3ea;
+  --ink:#10202e; --ink-soft:#3b4b5b; --ink-faint:#64748a;
+  --line:#c9d1dc; --line-strong:#aab5c3;
+  --navy:#0f3a5c; --navy-ink:#ffffff; --navy-soft:#e3ebf1; --navy-soft-ink:#0f3a5c;
+  --orange:#d9560a; --orange-ink:#ffffff; --orange-soft:#fbe4d2; --orange-soft-ink:#8a3505;
+  --ok:#157a40; --ok-soft:#dff2e6;
+  --warn:#8a5a06; --warn-soft:#fbead0;
+  --danger:#b3211c; --danger-soft:#fbe1df;
+  --focus:#1452d6;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px;
+  --r-sm:7px; --r-md:12px;
+  --bar-h:62px;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#10141c; --surface:#171d28; --surface-2:#1e2530; --surface-3:#262f3c;
-    --fg:#e8ecf3; --fg-muted:#9aa5b8; --fg-faint:#6b7689;
-    --border:#2b3340; --border-strong:#3a4452;
-    --accent:#ef8b3c; --accent-fg:#1a1206; --accent-soft:#2c1e0e; --accent-soft-fg:#ffc98c;
-    --ok:#53c17c; --ok-soft:#143322;
-    --warn:#e8b14e; --warn-soft:#3a2c0d;
-    --danger:#f0746f; --danger-soft:#3a1816;
-    --focus:#6f94ff;
+    --bg:#0e141c; --surface:#171f2a; --surface-alt:#1d2733; --surface-sunk:#121922;
+    --ink:#eaeff5; --ink-soft:#aab7c7; --ink-faint:#798aa0;
+    --line:#2d3845; --line-strong:#3e4b5a;
+    --navy:#5a9fd6; --navy-ink:#0b1420; --navy-soft:#1b2a38; --navy-soft-ink:#8fc3ec;
+    --orange:#f08a3c; --orange-ink:#1a1206; --orange-soft:#33220f; --orange-soft-ink:#ffc48a;
+    --ok:#56c282; --ok-soft:#133523;
+    --warn:#e7b24e; --warn-soft:#3a2c0d;
+    --danger:#f17872; --danger-soft:#3a1a18;
+    --focus:#6f9bff;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#10141c; --surface:#171d28; --surface-2:#1e2530; --surface-3:#262f3c;
-  --fg:#e8ecf3; --fg-muted:#9aa5b8; --fg-faint:#6b7689;
-  --border:#2b3340; --border-strong:#3a4452;
-  --accent:#ef8b3c; --accent-fg:#1a1206; --accent-soft:#2c1e0e; --accent-soft-fg:#ffc98c;
-  --ok:#53c17c; --ok-soft:#143322;
-  --warn:#e8b14e; --warn-soft:#3a2c0d;
-  --danger:#f0746f; --danger-soft:#3a1816;
-  --focus:#6f94ff;
+  --bg:#0e141c; --surface:#171f2a; --surface-alt:#1d2733; --surface-sunk:#121922;
+  --ink:#eaeff5; --ink-soft:#aab7c7; --ink-faint:#798aa0;
+  --line:#2d3845; --line-strong:#3e4b5a;
+  --navy:#5a9fd6; --navy-ink:#0b1420; --navy-soft:#1b2a38; --navy-soft-ink:#8fc3ec;
+  --orange:#f08a3c; --orange-ink:#1a1206; --orange-soft:#33220f; --orange-soft-ink:#ffc48a;
+  --ok:#56c282; --ok-soft:#133523;
+  --warn:#e7b24e; --warn-soft:#3a2c0d;
+  --danger:#f17872; --danger-soft:#3a1a18;
+  --focus:#6f9bff;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;padding:0}
-body{background:var(--bg);color:var(--fg);font-family:'Noto Sans KR','IBM Plex Sans KR',sans-serif;line-height:1.5}
+body{background:var(--bg);color:var(--ink);font-family:'Noto Sans KR','IBM Plex Sans KR',sans-serif;line-height:1.6;font-size:16px;overflow-x:hidden}
 h1,h2,h3,legend{font-family:'IBM Plex Sans KR','Noto Sans KR',sans-serif;text-wrap:balance}
 img{max-width:100%}
 [hidden]{display:none!important}
+button{-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 
-.app{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 48px}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);margin-bottom:12px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:12px;min-width:0}
-.brand-mark{flex:0 0 auto;width:38px;height:38px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent-soft-fg)}
-.brand-mark svg{width:20px;height:20px}
-.brand-title{font-weight:700;font-size:16px;letter-spacing:-.01em}
-.brand-sub{font-size:12.5px;color:var(--fg-muted)}
-.topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.progress-chip{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12.5px;padding:6px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg-muted)}
+.app{max-width:640px;margin:0 auto;padding-bottom:calc(var(--bar-h) + 28px + env(safe-area-inset-bottom,0px))}
+
+/* ---------- 상단 헤더 (고정) ---------- */
+.topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar-row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4) var(--sp-2);
+  padding-left:max(var(--sp-4),env(safe-area-inset-left,0px));padding-right:max(var(--sp-4),env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:var(--sp-3);min-width:0;flex:1 1 auto}
+.brand-mark{flex:0 0 auto;width:34px;height:34px;border-radius:9px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--navy-ink)}
+.brand-mark svg{width:19px;height:19px}
+.brand-title{font-weight:700;font-size:16px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress-chip{flex:0 0 auto;font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--line);color:var(--ink-soft)}
 .progress-chip[data-complete="true"]{background:var(--ok-soft);color:var(--ok);border-color:transparent}
 
-.pipeline-note{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:12px;background:var(--accent-soft);color:var(--accent-soft-fg);font-size:12.5px;border:1px solid transparent;margin-bottom:14px}
-.pipeline-note code{font-family:'IBM Plex Mono',monospace;background:rgba(0,0,0,.08);padding:1px 4px;border-radius:4px}
+.step-track{display:flex;gap:4px;list-style:none;margin:0;padding:0 var(--sp-4);
+  padding-left:max(var(--sp-4),env(safe-area-inset-left,0px));padding-right:max(var(--sp-4),env(safe-area-inset-right,0px))}
+.step-track li{flex:1 1 0;height:6px;border-radius:999px;background:var(--surface-sunk);border:1px solid var(--line)}
+.step-track li[data-state="done"]{background:var(--navy);border-color:var(--navy)}
+.step-track li[data-state="current"]{background:var(--orange);border-color:var(--orange)}
 
-/* 휴대폰 화면비율 기준 — 입력 위, 미리보기 아래로 세로 스택. 폭 넓은 화면에서도
-   같은 세로 흐름을 유지하되 가운데 정렬 + 최대폭만 넓혀서 보기 편하게 한다. */
-.layout{display:flex;flex-direction:column;gap:16px}
-.pane-preview{display:flex;flex-direction:column}
-.preview-card{max-height:none}
+.step-meta{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-2) var(--sp-4) var(--sp-3);
+  padding-left:max(var(--sp-4),env(safe-area-inset-left,0px));padding-right:max(var(--sp-4),env(safe-area-inset-right,0px))}
+.step-meta-label{font-size:13.5px;font-weight:700;color:var(--navy-soft-ink)}
+.step-meta-label b{font-family:'IBM Plex Mono',monospace;font-weight:700;margin-right:5px}
+.util-links{display:flex;gap:var(--sp-2)}
+.util-btn{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-faint);background:none;border:none;
+  padding:10px 6px;min-height:44px;display:flex;align-items:center;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
+.util-btn:hover{color:var(--ink)}
 
-fieldset.section{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px 16px 18px;margin:0 0 14px;min-width:0}
-fieldset.section legend{display:flex;align-items:center;gap:10px;padding:0 4px;font-size:14.5px;font-weight:700}
-.badge-num{flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-family:'IBM Plex Mono',monospace;font-size:12px;display:flex;align-items:center;justify-content:center}
-.section-note{font-size:12.5px;color:var(--fg-muted);margin:2px 0 14px;padding-left:34px}
+/* ---------- 본문 ---------- */
+.main{padding:var(--sp-5) var(--sp-4) var(--sp-2);
+  padding-left:max(var(--sp-4),env(safe-area-inset-left,0px));padding-right:max(var(--sp-4),env(safe-area-inset-right,0px))}
 
-.field-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
-.field-row.cols-3{grid-template-columns:repeat(3,1fr)}
-.field-row.cols-4{grid-template-columns:repeat(4,1fr)}
-@media (max-width:560px){ .field-row,.field-row.cols-3,.field-row.cols-4{grid-template-columns:1fr} }
+.step-panel{scroll-margin-top:12px}
+.step-head{margin-bottom:var(--sp-6)}
+.step-head-top{display:flex;align-items:baseline;gap:var(--sp-2);margin-bottom:6px}
+.step-badge{flex:0 0 auto;width:28px;height:28px;border-radius:999px;background:var(--navy);color:var(--navy-ink);
+  font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step-head h2{margin:0;font-size:21px;font-weight:700;letter-spacing:-.01em}
+.step-desc{margin:0;font-size:14px;color:var(--ink-soft);padding-left:38px}
 
-.field{display:flex;flex-direction:column;gap:5px;min-width:0}
-.field label{font-size:12.5px;font-weight:600;color:var(--fg-muted);display:flex;align-items:center;gap:6px}
-.req-dot{width:6px;height:6px;border-radius:999px;background:var(--danger);flex:0 0 auto}
-.opt-tag{font-size:10.5px;font-weight:500;color:var(--fg-faint);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
-.schema-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--fg-faint)}
+.group{margin:0 0 var(--sp-7)}
+.group:last-child{margin-bottom:0}
+.group-title{display:flex;align-items:center;gap:var(--sp-2);margin:0 0 var(--sp-3);padding-left:10px;
+  border-left:4px solid var(--orange);font-size:14.5px;font-weight:700;color:var(--ink)}
+.group-note{font-size:13px;color:var(--ink-faint);margin:-4px 0 var(--sp-4) 14px}
+
+.field-row{display:flex;flex-direction:column;gap:var(--sp-4);margin-bottom:var(--sp-4)}
+@media (min-width:700px){
+  .field-row.cols-2{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-4)}
+  .field-row.cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-4)}
+  .field-row.cols-4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4)}
+}
+
+.field{display:flex;flex-direction:column;gap:7px;min-width:0;margin-bottom:var(--sp-4)}
+.field:last-child{margin-bottom:0}
+.field-row .field{margin-bottom:0}
+.field-label{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:700;border-radius:5px;padding:2px 6px;letter-spacing:.01em}
+.tag-req{background:var(--orange-soft);color:var(--orange-soft-ink)}
+.tag-opt{background:var(--surface-alt);color:var(--ink-faint);border:1px solid var(--line)}
 
 input[type=text],input[type=number],input[type=datetime-local],select,textarea{
-  width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);font:inherit;font-size:13.5px
+  width:100%;padding:12px 13px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--surface-alt);color:var(--ink);font:inherit;font-size:16px;min-height:48px
 }
-textarea{resize:vertical;min-height:50px}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:transparent}
-input::placeholder,textarea::placeholder{color:var(--fg-faint)}
+textarea{resize:vertical;min-height:72px;line-height:1.5}
+input.invalid,select.invalid,textarea.invalid{border-color:var(--danger);background:var(--danger-soft)}
+input:focus,select:focus,textarea:focus{outline:3px solid var(--focus);outline-offset:1px;border-color:transparent}
+input::placeholder,textarea::placeholder{color:var(--ink-faint)}
 
-.radio-group{display:flex;gap:14px;flex-wrap:wrap;padding-top:2px}
-.radio-group label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--fg)}
-.radio-group input{accent-color:var(--accent)}
+.step-error{position:fixed;left:var(--sp-4);right:var(--sp-4);
+  bottom:calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 10px);
+  z-index:31;max-width:608px;margin:0 auto;display:flex;align-items:center;gap:8px;
+  background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);
+  border-radius:var(--r-sm);padding:12px 14px;font-size:13.5px;font-weight:700;
+  box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.step-error[hidden]{display:none}
 
-.subblock{border-left:2px solid var(--border);padding-left:12px;margin:4px 0 2px;display:grid;gap:10px}
+.radio-group{display:flex;gap:var(--sp-3);flex-wrap:wrap;padding-top:2px}
+.radio-group label{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--ink);
+  padding:11px 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface-alt);min-height:44px;cursor:pointer}
+.radio-group input{accent-color:var(--orange);width:18px;height:18px}
+
+.subblock{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-4);margin:var(--sp-3) 0 0;
+  display:grid;gap:var(--sp-4);background:var(--surface)}
 .subblock[hidden]{display:none}
 
-.rows{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.row-item{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center}
-.row-item.event{grid-template-columns:1fr 1.4fr 0.9fr 1.2fr auto}
-.row-item.equip{grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 0.9fr auto}
-.row-item.kv{grid-template-columns:1fr 1.6fr auto}
-.row-item.photo{grid-template-columns:auto 1fr auto;align-items:center}
-@media (max-width:620px){ .row-item,.row-item.event,.row-item.equip,.row-item.kv{grid-template-columns:1fr} }
-.row-remove{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--danger);cursor:pointer;font-size:15px;line-height:1}
-.row-remove:hover{background:var(--danger-soft)}
-.row-hint{font-size:10.5px;color:var(--fg-faint)}
+.rows{display:flex;flex-direction:column;gap:var(--sp-3);margin-bottom:var(--sp-3)}
+.row-item{display:grid;grid-template-columns:1fr;gap:8px;align-items:center;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-sm);padding:10px}
+.row-item input,.row-item select{min-height:44px}
+@media (min-width:700px){
+  .row-item{grid-template-columns:1fr 1fr 1fr auto}
+  .row-item.event{grid-template-columns:1fr 1.3fr 0.9fr 1.2fr auto}
+  .row-item.equip{grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 0.9fr auto}
+  .row-item.kv{grid-template-columns:1fr 1.6fr auto}
+  .row-item.photo{grid-template-columns:auto 1fr auto}
+}
+.row-remove{flex:0 0 auto;width:44px;height:44px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--surface-alt);color:var(--danger);cursor:pointer;font-size:19px;line-height:1;justify-self:end}
+.row-remove:hover{background:var(--danger-soft);border-color:var(--danger)}
+.row-hint{font-size:12.5px;color:var(--ink-faint);margin:0 0 var(--sp-2)}
 
-.flow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-@media (max-width:620px){ .flow-grid{grid-template-columns:1fr 1fr} }
-.flow-step{display:flex;flex-direction:column;gap:4px}
-.flow-step span{font-size:10.5px;color:var(--fg-faint);font-family:'IBM Plex Mono',monospace}
+.flow-grid{display:flex;flex-direction:column;gap:var(--sp-3)}
+@media (min-width:560px){ .flow-grid{display:grid;grid-template-columns:1fr 1fr} }
+.flow-step{display:flex;align-items:center;gap:10px}
+.flow-step span{flex:0 0 auto;width:26px;height:26px;border-radius:999px;background:var(--navy-soft);
+  color:var(--navy-soft-ink);font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.flow-step input{flex:1 1 auto}
 
-.btn{font:inherit;font-weight:600;font-size:13px;padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);cursor:pointer;white-space:nowrap}
-.btn:hover{border-color:var(--border-strong)}
-.btn-accent{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.btn-accent:hover{filter:brightness(1.06)}
+.btn{font:inherit;font-weight:700;font-size:14.5px;padding:11px 16px;border-radius:var(--r-sm);
+  border:1px solid var(--line);background:var(--surface-alt);color:var(--ink);cursor:pointer;
+  min-height:48px;white-space:nowrap}
+.btn:hover{border-color:var(--line-strong)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-accent{background:var(--orange);border-color:var(--orange);color:var(--orange-ink)}
+.btn-accent:hover{filter:brightness(1.05)}
 .btn-accent:disabled{opacity:.55;cursor:not-allowed;filter:none}
 .btn-ghost{background:transparent}
-.btn-sm{padding:6px 10px;font-size:12.5px}
-.btn-add{align-self:flex-start}
+.btn-sm{padding:9px 13px;font-size:13px;min-height:44px}
+.btn-add{align-self:flex-start;width:100%}
+@media (min-width:560px){ .btn-add{width:auto} }
 
-.photo-thumb-wrap{display:flex;align-items:center;gap:8px;flex:0 0 auto}
-.photo-thumb{width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex:0 0 auto;background:var(--surface-3)}
-.photo-pick-btn{font-size:11.5px;padding:7px 10px}
+.photo-thumb-wrap{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.photo-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:0 0 auto;background:var(--surface-sunk)}
+.photo-pick-btn{font-size:13px;padding:11px 14px}
 
-.ocr-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.ocr-raw{max-height:160px;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11.5px;margin:0 0 8px}
+.ocr-box{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:var(--sp-3)}
+.ocr-raw{max-height:160px;overflow:auto;background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;margin:0 0 var(--sp-3)}
 
-.preview-card{border:1px solid var(--border);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;min-height:0;flex:1}
-.preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
-.preview-tabs{display:flex;gap:6px;flex-wrap:wrap}
-.ptab{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
-.ptab[data-active="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-.preview-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.preview-body{padding:14px 16px;overflow:auto;min-height:0}
-.preview-text{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.1px;white-space:pre-wrap;word-break:break-word;color:var(--fg);margin:0}
-.view[hidden]{display:none}
-.missing{margin:0;padding:12px 16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--warn);background:var(--warn-soft);display:none}
+/* ---------- 확인 및 생성(마지막 단계) ---------- */
+.gen-intro{font-size:13px;color:var(--ink-soft);background:var(--navy-soft);color:var(--navy-soft-ink);
+  border-radius:var(--r-sm);padding:12px 14px;margin:0 0 var(--sp-5)}
+.missing{margin:0 0 var(--sp-5);padding:14px 16px;border-radius:var(--r-md);font-size:13.5px;color:var(--warn);
+  background:var(--warn-soft);display:none}
 .missing[data-show="true"]{display:block}
-.missing ul{margin:6px 0 0;padding-left:18px}
+.missing strong{display:block;margin-bottom:6px;font-size:14px}
+.missing ul{margin:0;padding-left:18px}
+.missing li{margin:2px 0}
 
-.copy-flash{font-size:11.5px;color:var(--ok);opacity:0;transition:opacity .25s}
+.preview-card{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);overflow:hidden}
+.preview-tabs{display:flex;gap:6px;padding:var(--sp-3);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ptab{flex:1 1 auto;font-size:13px;font-weight:700;padding:11px 10px;border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--surface-alt);color:var(--ink-soft);cursor:pointer;min-height:44px}
+.ptab[data-active="true"]{background:var(--navy);border-color:var(--navy);color:var(--navy-ink)}
+.preview-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:var(--sp-3);border-bottom:1px solid var(--line)}
+.preview-body{padding:var(--sp-4);overflow:auto}
+.preview-text{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;white-space:pre-wrap;word-break:break-word;color:var(--ink);margin:0}
+
+.preview-blocks{display:flex;flex-direction:column;gap:var(--sp-4)}
+.pv-block{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-4);background:var(--surface)}
+.pv-block-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:var(--sp-3)}
+.pv-block-title{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
+.pv-block-title .step-badge{width:22px;height:22px;font-size:11px;flex:0 0 auto}
+.pv-edit-btn{flex:0 0 auto;font-size:12.5px;font-weight:700;padding:8px 13px;min-height:40px;border-radius:var(--r-sm);
+  border:1px solid var(--navy);background:var(--navy-soft);color:var(--navy-soft-ink);cursor:pointer}
+.pv-edit-btn:hover{filter:brightness(.96)}
+.pv-lines{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.pv-lines li{font-size:13.5px;color:var(--ink-soft);line-height:1.5;word-break:break-word}
+.pv-lines li b{color:var(--ink);font-weight:600}
+.pv-empty{color:var(--ink-faint)}
+
+.copy-flash{font-size:12.5px;font-weight:700;color:var(--ok);opacity:0;transition:opacity .25s}
 .copy-flash[data-show="true"]{opacity:1}
 
-.howto{border-top:1px solid var(--border);padding:12px 16px;font-size:11.5px;color:var(--fg-muted)}
-.howto code{font-family:'IBM Plex Mono',monospace;background:var(--surface-2);padding:1px 4px;border-radius:4px}
-
-.gen-box{display:flex;flex-direction:column;gap:12px}
-.gen-status{font-family:'IBM Plex Mono',monospace;font-size:11.5px;white-space:pre-wrap;color:var(--fg-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:60px}
+.gen-box{display:flex;flex-direction:column;gap:var(--sp-4)}
+.gen-status{font-family:'IBM Plex Mono',monospace;font-size:12.5px;white-space:pre-wrap;color:var(--ink-soft);
+  background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 13px;min-height:60px}
 .gen-status .ok{color:var(--ok)}
 .gen-status .err{color:var(--danger)}
 .gen-status .warn{color:var(--warn)}
-.gen-download{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.gen-download a{font-weight:700}
-.gen-note{font-size:11.5px;color:var(--fg-faint)}
-.spinner{width:14px;height:14px;border-radius:999px;border:2px solid var(--border);border-top-color:var(--accent);display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+.gen-download{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.gen-download a{font-weight:700;width:100%;text-align:center}
+.gen-note{font-size:12.5px;color:var(--ink-faint)}
+.spinner{width:14px;height:14px;border-radius:999px;border:2px solid var(--line);border-top-color:var(--orange);display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:18px}</style>
+#genBtn{width:100%}
+
+footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(--sp-6) var(--sp-4) 0}
+
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- 하단 고정 이전/다음 바 ---------- */
+.step-nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;gap:var(--sp-3);
+  padding:var(--sp-3) var(--sp-4);padding-bottom:max(var(--sp-3),env(safe-area-inset-bottom,0px));
+  background:var(--surface);border-top:1px solid var(--line);
+  max-width:640px;margin:0 auto}
+.btn-nav{flex:1 1 0;min-height:52px;font-size:16px;text-align:center;justify-content:center}
+.btn-nav[hidden]{display:none}</style>
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-      </span>
-      <div>
-        <div class="brand-title">고장보고서 생성기 (휴대폰 단독실행판)</div>
-        <div class="brand-sub">입력부터 HWPX 저장까지 이 페이지 안에서 전부 끝납니다. PC·한컴오피스·서버 불필요.</div>
+    <div class="topbar-row">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        </span>
+        <div class="brand-title">고장보고서 생성기</div>
       </div>
-    </div>
-    <div class="topbar-actions">
       <span class="progress-chip" id="progressChip">필수 0/8</span>
     </div>
+    <ol class="step-track" id="stepTrack" aria-hidden="true">
+      <li data-step="1"></li><li data-step="2"></li><li data-step="3"></li><li data-step="4"></li><li data-step="5"></li>
+    </ol>
+    <div class="step-meta">
+      <p class="step-meta-label" id="stepMetaLabel"><b>1 / 5</b>기본 정보</p>
+      <div class="util-links">
+        <button type="button" class="util-btn" id="exampleBtn">예시 불러오기</button>
+        <button type="button" class="util-btn" id="resetBtn">초기화</button>
+      </div>
+    </div>
+    <p class="sr-only" id="stepAnnounce" role="status" aria-live="polite"></p>
   </header>
 
-  <div class="pipeline-note">
-    <span>ⓘ</span>
-    <span>이 파일은 Claude 링크가 아니라 <b>이 기기에 저장된 독립 HTML</b>입니다. 입력을 마치고
-    아래 "HWPX 생성" 탭의 버튼을 누르면, 브라우저 안에서 파이썬(Pyodide)이 실행되어
-    <code>python-hwpx</code>로 진짜 .hwpx 파일을 만들고 바로 다운로드됩니다. 최초 1회만
-    인터넷에서 파이썬 엔진(약 20~30MB)을 내려받고, 그 다음부터는 캐시돼 더 빠릅니다.</span>
-  </div>
+  <main class="main">
+    <form id="reportForm">
 
-  <main class="layout">
-    <section class="pane pane-form" id="paneForm">
-      <form id="reportForm">
+      <!-- ============ STEP 1 · 기본 정보 ============ -->
+      <section class="step-panel" data-step="1" id="step1">
+        <div class="step-head">
+          <div class="step-head-top"><span class="step-badge">1</span><h2>기본 정보</h2></div>
+          <p class="step-desc">이 앱은 입력부터 HWPX 저장까지 휴대폰 안에서 전부 처리합니다. 먼저 설비와 고장종류를 선택하세요.</p>
+        </div>
 
-        <fieldset class="section">
-          <legend><span class="badge-num">0</span>분류</legend>
+        <div class="group">
+          <p class="group-title">분류</p>
           <div class="field-row cols-3">
             <div class="field">
-              <label for="faultType"><span class="req-dot"></span>고장종류</label>
+              <label class="field-label" for="faultType"><span class="tag tag-req">필수</span>고장종류</label>
               <select id="faultType">
                 <option value="">선택 안 함</option>
                 <option>외물접촉형</option>
@@ -215,7 +312,7 @@ footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:
               </select>
             </div>
             <div class="field">
-              <label for="equipType"><span class="req-dot"></span>설비유형</label>
+              <label class="field-label" for="equipType"><span class="tag tag-req">필수</span>설비유형</label>
               <select id="equipType">
                 <option value="">선택</option>
                 <option value="송전선로">송전선로(T/L)</option>
@@ -225,63 +322,71 @@ footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:
               </select>
             </div>
             <div class="field">
-              <label for="voltage"><span class="req-dot"></span>전압급</label>
+              <label class="field-label" for="voltage"><span class="tag tag-req">필수</span>전압급</label>
               <select id="voltage">
                 <option value="">선택</option>
                 <option>765kV</option><option>345kV</option><option>154kV</option><option>23kV</option>
               </select>
             </div>
           </div>
-          <p class="section-note" style="padding-left:0">고장종류를 고르면 흐름도·재발방지·사진·이벤트 칸에
-          해당 유형의 기본 문구가 채워집니다(모두 수정 가능).</p>
-        </fieldset>
+          <p class="group-note">고장종류를 고르면 흐름도·재발방지·사진·이벤트 칸에 해당 유형의 기본 문구가 채워집니다(모두 수정 가능).</p>
+        </div>
 
-        <fieldset class="section">
-          <legend><span class="badge-num">1</span>필수</legend>
-          <div class="field-row">
+        <div class="group">
+          <p class="group-title">현장 기본정보</p>
+          <div class="field-row cols-2">
             <div class="field">
-              <label for="region"><span class="req-dot"></span>지역본부</label>
+              <label class="field-label" for="region"><span class="tag tag-req">필수</span>지역본부</label>
               <input type="text" id="region" placeholder="예: 광주전남">
             </div>
             <div class="field">
-              <label for="assetName"><span class="req-dot"></span>설비명</label>
+              <label class="field-label" for="assetName"><span class="tag tag-req">필수</span>설비명</label>
               <input type="text" id="assetName" placeholder="예: 해남변전소 2변압기, 화성남양#1T/L">
             </div>
           </div>
-          <div class="field-row cols-3">
+          <div class="field-row cols-2">
             <div class="field">
-              <label for="occurredAt"><span class="req-dot"></span>발생일시</label>
+              <label class="field-label" for="occurredAt"><span class="tag tag-req">필수</span>발생일시</label>
               <input type="datetime-local" id="occurredAt" step="1">
             </div>
             <div class="field">
-              <label for="weather"><span class="req-dot"></span>날씨</label>
+              <label class="field-label" for="weather"><span class="tag tag-req">필수</span>날씨</label>
               <select id="weather">
                 <option value="">선택</option>
                 <option>맑음</option><option>흐림</option><option>비</option><option>눈</option>
                 <option>강풍</option><option value="__custom">직접입력(수치 포함)</option>
               </select>
             </div>
-            <div class="field" id="weatherCustomField" hidden>
-              <label for="weatherCustom">날씨 상세(수치)</label>
-              <input type="text" id="weatherCustom" placeholder="예: 강풍 6.0m/s">
-            </div>
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="cause"><span class="req-dot"></span>고장원인</label>
-              <textarea id="cause" placeholder="예: 해남D/L 차단기 부동작에 의한 2변압기 파급정지"></textarea>
-            </div>
-            <div class="field">
-              <label for="relayAction">계전기 동작사항</label>
-              <textarea id="relayAction" placeholder="예: 해남D/L OCR 동작, 2변압기 51S 동작"></textarea>
-            </div>
+          <div class="field" id="weatherCustomField" hidden>
+            <label class="field-label" for="weatherCustom">날씨 상세(수치)</label>
+            <input type="text" id="weatherCustom" placeholder="예: 강풍 6.0m/s" inputmode="text">
           </div>
-        </fieldset>
+        </div>
+      </section>
 
-        <fieldset class="section">
-          <legend><span class="badge-num">2</span>상황에 따라 필수</legend>
+      <!-- ============ STEP 2 · 고장 상황 ============ -->
+      <section class="step-panel" data-step="2" id="step2" hidden>
+        <div class="step-head">
+          <div class="step-head-top"><span class="step-badge">2</span><h2>고장 상황</h2></div>
+          <p class="step-desc">무슨 일이 있었는지, 정전·보도 여부와 유형별 특이사항을 적어주세요.</p>
+        </div>
+
+        <div class="group">
+          <p class="group-title">원인</p>
           <div class="field">
-            <label>정전 여부</label>
+            <label class="field-label" for="cause"><span class="tag tag-req">필수</span>고장원인</label>
+            <textarea id="cause" placeholder="예: 해남D/L 차단기 부동작에 의한 2변압기 파급정지"></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="relayAction"><span class="tag tag-opt">선택</span>계전기 동작사항</label>
+            <textarea id="relayAction" placeholder="예: 해남D/L OCR 동작, 2변압기 51S 동작"></textarea>
+          </div>
+        </div>
+
+        <div class="group">
+          <p class="group-title">정전 여부</p>
+          <div class="field">
             <div class="radio-group">
               <label><input type="radio" name="outage" value="없음" checked>정전없음</label>
               <label><input type="radio" name="outage" value="있음">정전있음</label>
@@ -289,128 +394,170 @@ footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:
           </div>
           <div class="subblock" id="outageBlock" hidden>
             <div class="field-row cols-4">
-              <div class="field"><label for="outageMin">정전시간(분)</label><input type="number" id="outageMin" min="0"></div>
-              <div class="field"><label for="outageMw">정전부하(MW)</label><input type="number" id="outageMw" min="0" step="0.1"></div>
-              <div class="field"><label for="outageRegion">정전지역</label><input type="text" id="outageRegion" placeholder="예: 대구수성구 일대"></div>
-              <div class="field"><label for="outageHouseholds">세대수</label><input type="number" id="outageHouseholds" min="0"></div>
+              <div class="field"><label class="field-label" for="outageMin"><span class="tag tag-opt">선택</span>정전시간(분)</label><input type="number" id="outageMin" min="0" inputmode="numeric"></div>
+              <div class="field"><label class="field-label" for="outageMw"><span class="tag tag-opt">선택</span>정전부하(MW)</label><input type="number" id="outageMw" min="0" step="0.1" inputmode="decimal"></div>
+              <div class="field"><label class="field-label" for="outageRegion"><span class="tag tag-opt">선택</span>정전지역</label><input type="text" id="outageRegion" placeholder="예: 대구수성구 일대"></div>
+              <div class="field"><label class="field-label" for="outageHouseholds"><span class="tag tag-opt">선택</span>세대수</label><input type="number" id="outageHouseholds" min="0" inputmode="numeric"></div>
             </div>
           </div>
+        </div>
 
-          <div class="field" style="margin:10px 0">
-            <label>언론보도/민원 여부</label>
+        <div class="group">
+          <p class="group-title">언론보도/민원 여부</p>
+          <div class="field">
             <div class="radio-group">
               <label><input type="radio" name="media" value="없음" checked>없음</label>
               <label><input type="radio" name="media" value="있음">있음</label>
             </div>
           </div>
           <div class="subblock" id="mediaBlock" hidden>
-            <div class="field-row">
-              <div class="field"><label for="mediaOutlet">매체명</label><input type="text" id="mediaOutlet" placeholder="예: 연합뉴스"></div>
-              <div class="field"><label for="mediaCount">건수</label><input type="number" id="mediaCount" min="0"></div>
+            <div class="field-row cols-2">
+              <div class="field"><label class="field-label" for="mediaOutlet"><span class="tag tag-opt">선택</span>매체명</label><input type="text" id="mediaOutlet" placeholder="예: 연합뉴스"></div>
+              <div class="field"><label class="field-label" for="mediaCount"><span class="tag tag-opt">선택</span>건수</label><input type="number" id="mediaCount" min="0" inputmode="numeric"></div>
             </div>
           </div>
+        </div>
 
-          <div class="field" id="equipTableField">
-            <label>설비 제원(변압기·모선형)</label>
-            <div class="rows" id="equipRows"></div>
-            <button type="button" class="btn btn-sm btn-add" id="addEquipRow">+ 설비 추가</button>
-          </div>
+        <div class="group">
+          <p class="group-title">유형별 특이사항 <span class="tag tag-opt">선택</span></p>
+          <div class="rows" id="kvRows"></div>
+          <button type="button" class="btn btn-sm btn-add" id="addKvRow">+ 항목 추가</button>
+        </div>
+      </section>
 
-          <div class="field" style="margin-top:12px">
-            <label>고장 흐름 4단계</label>
-            <div class="flow-grid" id="flowGrid">
-              <div class="flow-step"><span>1</span><input type="text" class="flow-input" data-i="0"></div>
-              <div class="flow-step"><span>2</span><input type="text" class="flow-input" data-i="1"></div>
-              <div class="flow-step"><span>3</span><input type="text" class="flow-input" data-i="2"></div>
-              <div class="flow-step"><span>4</span><input type="text" class="flow-input" data-i="3"></div>
-            </div>
-          </div>
+      <!-- ============ STEP 3 · 원인 및 조치 ============ -->
+      <section class="step-panel" data-step="3" id="step3" hidden>
+        <div class="step-head">
+          <div class="step-head-top"><span class="step-badge">3</span><h2>원인 및 조치</h2></div>
+          <p class="step-desc">고장이 어떻게 진행됐고 어떤 조치를 했는지 시간 순으로 정리하세요.</p>
+        </div>
 
-          <div class="field" style="margin-top:12px">
-            <label>유형별 특이사항</label>
-            <div class="rows" id="kvRows"></div>
-            <button type="button" class="btn btn-sm btn-add" id="addKvRow">+ 항목 추가</button>
+        <div class="group">
+          <p class="group-title">고장 흐름 4단계 <span class="tag tag-opt">선택</span></p>
+          <div class="flow-grid" id="flowGrid">
+            <div class="flow-step"><span>1</span><input type="text" class="flow-input" data-i="0"></div>
+            <div class="flow-step"><span>2</span><input type="text" class="flow-input" data-i="1"></div>
+            <div class="flow-step"><span>3</span><input type="text" class="flow-input" data-i="2"></div>
+            <div class="flow-step"><span>4</span><input type="text" class="flow-input" data-i="3"></div>
           </div>
+        </div>
 
-          <div class="field" style="margin-top:12px">
-            <label>조치/복구 경과(시간순)</label>
-            <div class="rows" id="actionRows"></div>
-            <button type="button" class="btn btn-sm btn-add" id="addActionRow">+ 조치 항목 추가</button>
-          </div>
+        <div class="group">
+          <p class="group-title">조치/복구 경과(시간순) <span class="tag tag-opt">선택</span></p>
+          <div class="rows" id="actionRows"></div>
+          <button type="button" class="btn btn-sm btn-add" id="addActionRow">+ 조치 항목 추가</button>
+        </div>
 
-          <div class="field" style="margin-top:12px">
-            <label>이벤트 발생내역</label>
-            <p class="row-hint">계전기/모니터 화면을 찍은 사진 한 장이면 자동으로 행이 채워집니다.
-            OCR 결과는 틀릴 수 있으니 채워진 값을 꼭 확인·수정하세요.</p>
-            <div class="ocr-box">
-              <label class="btn btn-sm photo-pick-btn">📷 사진으로 자동입력(OCR)<input type="file" accept="image/*" hidden id="eventOcrPick"></label>
-              <button type="button" class="btn btn-sm btn-ghost" id="eventOcrRawToggle" hidden>인식된 글자 보기</button>
-            </div>
-            <div class="gen-status" id="eventOcrStatus" hidden></div>
-            <pre class="preview-text ocr-raw" id="eventOcrRaw" hidden></pre>
-            <div class="rows" id="eventRows"></div>
-            <button type="button" class="btn btn-sm btn-add" id="addEventRow">+ 이벤트 행 추가</button>
+        <div class="group">
+          <p class="group-title">이벤트 발생내역 <span class="tag tag-opt">선택</span></p>
+          <p class="row-hint">계전기/모니터 화면을 찍은 사진 한 장이면 자동으로 행이 채워집니다.
+          OCR 결과는 틀릴 수 있으니 채워진 값을 꼭 확인·수정하세요.</p>
+          <div class="ocr-box">
+            <label class="btn btn-sm photo-pick-btn">📷 사진으로 자동입력(OCR)<input type="file" accept="image/*" hidden id="eventOcrPick"></label>
+            <button type="button" class="btn btn-sm btn-ghost" id="eventOcrRawToggle" hidden>인식된 글자 보기</button>
           </div>
-        </fieldset>
+          <div class="gen-status" id="eventOcrStatus" hidden></div>
+          <pre class="preview-text ocr-raw" id="eventOcrRaw" hidden></pre>
+          <div class="rows" id="eventRows"></div>
+          <button type="button" class="btn btn-sm btn-add" id="addEventRow">+ 이벤트 행 추가</button>
+        </div>
+      </section>
 
-        <fieldset class="section">
-          <legend><span class="badge-num">3</span>선택 <span class="opt-tag">없으면 유형 기본 문구 사용</span></legend>
-          <div class="field-row">
-            <div class="field"><label for="futurePlan">재발방지대책/향후계획</label><textarea id="futurePlan"></textarea></div>
-            <div class="field"><label for="diagramCaption">간이단선도 캡션</label><textarea id="diagramCaption" placeholder="예: 2변압기 정지 / D/L 5개 정지 / 해남D/L 부동작"></textarea></div>
-          </div>
-          <div class="field-row">
-            <div class="field"><label for="towerInfo">철탑/구간 정보(송전선로, 정지설비에 합쳐짐)</label><textarea id="towerInfo" placeholder="예: 15호 철탑, 경간 320m"></textarea></div>
-            <div class="field"><label for="stoppedDetail">정지설비 상세 직접 입력(선택)</label><textarea id="stoppedDetail" placeholder="비우면 전압급+지역본부+설비명으로 자동 구성"></textarea></div>
-          </div>
+      <!-- ============ STEP 4 · 설비/사진 ============ -->
+      <section class="step-panel" data-step="4" id="step4" hidden>
+        <div class="step-head">
+          <div class="step-head-top"><span class="step-badge">4</span><h2>설비/사진</h2></div>
+          <p class="step-desc">관련 설비 제원과 현장 사진을 첨부하세요. 비워두면 유형 기본 문구가 사용됩니다.</p>
+        </div>
 
+        <div class="group" id="equipTableField">
+          <p class="group-title">설비 제원(변압기·모선형) <span class="tag tag-opt">선택</span></p>
+          <div class="rows" id="equipRows"></div>
+          <button type="button" class="btn btn-sm btn-add" id="addEquipRow">+ 설비 추가</button>
+        </div>
+
+        <div class="group">
+          <p class="group-title">재발방지대책/향후계획 <span class="tag tag-opt">선택</span></p>
+          <div class="field"><textarea id="futurePlan"></textarea></div>
+        </div>
+
+        <div class="group">
+          <p class="group-title">도면/정지설비 상세 <span class="tag tag-opt">선택</span></p>
           <div class="field">
-            <label>현장사진 (여기서 고른 사진이 HWPX 안에 실제로 삽입됩니다)</label>
-            <p class="row-hint">카메라로 바로 찍거나, 카톡으로 받은 사진을 갤러리에서 선택하면 됩니다.
-            이 페이지가 파일을 어디로 보내지 않습니다 — 전부 이 기기 안에서만 처리됩니다.</p>
-            <div class="rows" id="photoRows"></div>
-            <button type="button" class="btn btn-sm btn-add" id="addPhotoRow">+ 사진 항목 추가</button>
+            <label class="field-label" for="diagramCaption">간이단선도 캡션</label>
+            <textarea id="diagramCaption" placeholder="예: 2변압기 정지 / D/L 5개 정지 / 해남D/L 부동작"></textarea>
           </div>
-        </fieldset>
-      </form>
-    </section>
+          <div class="field">
+            <label class="field-label" for="towerInfo">철탑/구간 정보(송전선로, 정지설비에 합쳐짐)</label>
+            <textarea id="towerInfo" placeholder="예: 15호 철탑, 경간 320m"></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="stoppedDetail">정지설비 상세 직접 입력</label>
+            <textarea id="stoppedDetail" placeholder="비우면 전압급+지역본부+설비명으로 자동 구성"></textarea>
+          </div>
+        </div>
 
-    <aside class="pane pane-preview" id="panePreview">
-      <div class="preview-card">
-        <div class="preview-head">
-          <div class="preview-tabs">
-            <button type="button" class="ptab" id="ptabText" data-active="true">요약 미리보기</button>
-            <button type="button" class="ptab" id="ptabJson" data-active="false">JSON</button>
-            <button type="button" class="ptab" id="ptabGen" data-active="false">HWPX 생성</button>
-          </div>
-          <div class="preview-actions">
-            <span class="copy-flash" id="copyFlash">복사됨</span>
-            <button type="button" class="btn btn-sm" id="exampleBtn">예시 불러오기</button>
-            <button type="button" class="btn btn-sm" id="resetBtn">초기화</button>
-            <button type="button" class="btn btn-sm btn-accent" id="copyBtn">복사하기</button>
-          </div>
+        <div class="group">
+          <p class="group-title">현장사진 <span class="tag tag-opt">선택</span></p>
+          <p class="row-hint">카메라로 바로 찍거나, 카톡으로 받은 사진을 갤러리에서 선택하면 됩니다.
+          이 페이지가 파일을 어디로 보내지 않습니다 — 전부 이 기기 안에서만 처리됩니다. 아래 사진 선택 버튼을 누르면
+          카메라 촬영 또는 갤러리에서 고르는 메뉴가 바로 나타납니다.</p>
+          <div class="rows" id="photoRows"></div>
+          <button type="button" class="btn btn-sm btn-add" id="addPhotoRow">+ 사진 항목 추가</button>
         </div>
-        <div class="preview-body">
-          <div class="view" id="viewText"><pre class="preview-text" id="previewText"></pre></div>
-          <div class="view" id="viewJson" hidden><pre class="preview-text" id="previewJson"></pre></div>
-          <div class="view gen-box" id="viewGen" hidden>
-            <button type="button" class="btn btn-accent" id="genBtn">HWPX 만들기 (이 기기에서 바로)</button>
-            <div class="gen-status" id="genStatus">대기 중 — 위 버튼을 누르면 시작합니다. 최초 1회는 파이썬 엔진을 내려받느라 20~40초 정도 걸릴 수 있습니다.</div>
-            <div class="gen-download" id="genDownload" hidden>
-              <a id="genDownloadLink" class="btn btn-accent" download>📄 HWPX 파일 다운로드</a>
-              <span class="gen-note" id="genSizeNote"></span>
-            </div>
-          </div>
+      </section>
+
+      <!-- ============ STEP 5 · 확인 및 생성 ============ -->
+      <section class="step-panel" data-step="5" id="step5" hidden>
+        <div class="step-head">
+          <div class="step-head-top"><span class="step-badge">5</span><h2>확인 및 생성</h2></div>
+          <p class="step-desc">누락된 항목을 확인하고 HWPX 보고서를 생성하세요.</p>
         </div>
+
+        <p class="gen-intro">이 보고서는 이 기기 안에만 저장됩니다. HWPX 생성 시 최초 1회만 파이썬 엔진(약 20~30MB)을
+        내려받고, 이후에는 캐시되어 더 빨라집니다.</p>
+
         <div class="missing" id="missingBox">
           <strong>아직 비어있는 필수 항목</strong>
           <ul id="missingList"></ul>
         </div>
-      </div>
-    </aside>
+
+        <div class="preview-card">
+          <div class="preview-tabs">
+            <button type="button" class="ptab" id="ptabGen" data-active="true">HWPX 생성</button>
+            <button type="button" class="ptab" id="ptabText" data-active="false">요약 미리보기</button>
+            <button type="button" class="ptab" id="ptabJson" data-active="false">JSON</button>
+          </div>
+          <div class="preview-actions">
+            <span class="copy-flash" id="copyFlash">복사됨</span>
+            <button type="button" class="btn btn-sm" id="copyBtn">미리보기 복사하기</button>
+          </div>
+          <div class="preview-body">
+            <div class="view gen-box" id="viewGen">
+              <button type="button" class="btn btn-accent" id="genBtn">HWPX 생성</button>
+              <div class="gen-status" id="genStatus">대기 중 — 위 버튼을 누르면 시작합니다. 최초 1회는 파이썬 엔진을 내려받느라 20~40초 정도 걸릴 수 있습니다.</div>
+              <div class="gen-download" id="genDownload" hidden>
+                <a id="genDownloadLink" class="btn btn-accent" download>📄 HWPX 파일 다운로드</a>
+                <span class="gen-note" id="genSizeNote"></span>
+              </div>
+            </div>
+            <div class="view" id="viewText" hidden><div class="preview-blocks" id="previewText"></div></div>
+            <div class="view" id="viewJson" hidden><pre class="preview-text" id="previewJson"></pre></div>
+          </div>
+        </div>
+      </section>
+
+    </form>
+
+    <footer class="hint">입력 내용은 이 브라우저에만 자동 저장됩니다(초안 임시저장). 사진·JSON 모두 외부로 전송되지 않습니다.</footer>
   </main>
 
-  <footer class="hint">입력 내용은 이 브라우저에만 자동 저장됩니다(초안 임시저장). 사진·JSON 모두 외부로 전송되지 않습니다.</footer>
+  <p class="step-error" id="stepError" role="alert" hidden></p>
+
+  <nav class="step-nav" aria-label="단계 이동">
+    <button type="button" class="btn btn-nav" id="stepPrevBtn">← 이전</button>
+    <button type="button" class="btn btn-nav btn-accent" id="stepNextBtn">다음 →</button>
+  </nav>
 </div>
 
 <script>(function(){
@@ -811,11 +958,64 @@ footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:
     else { box.dataset.show = "false"; list.innerHTML = ""; }
   }
 
+  function escapeHtml(s){
+    return String(s==null?"":s).replace(/[&<>"]/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
+    });
+  }
+  function pvLine(label, value){
+    var v = (value===null || value===undefined || value==="") ? '<span class="pv-empty">(미입력)</span>' : escapeHtml(value);
+    return "<li><b>" + escapeHtml(label) + ":</b> " + v + "</li>";
+  }
+  function pvBlock(step, title, linesHtml){
+    return '<div class="pv-block"><div class="pv-block-head">' +
+      '<span class="pv-block-title"><span class="step-badge">' + step + '</span>' + escapeHtml(title) + '</span>' +
+      '<button type="button" class="pv-edit-btn" data-goto-step="' + step + '">수정</button>' +
+      '</div><ul class="pv-lines">' + linesHtml + '</ul></div>';
+  }
+
+  // 단계별로 묶어 각 블록에 "수정" 버튼을 달아 보여준다 — 버튼을 누르면 해당 입력
+  // 단계로 바로 이동한다(실제 HWPX 생성은 항상 1~4단계 원본 필드값을 다시 읽어 만들며,
+  // 이 블록 표시는 확인용일 뿐 별도의 데이터 소스가 아니다).
+  function renderStepPreviewBlocks(){
+    var inc = buildIncident();
+    var kv = collectKvRows();
+    var equip = collectEquipRows();
+    var actions = collectActionRows();
+    var events = collectEventRows();
+    var photos = collectPhotoRows();
+    var outageOn = document.querySelector('input[name="outage"]:checked').value === "있음";
+    var mediaOn = document.querySelector('input[name="media"]:checked').value === "있음";
+
+    var b1 = pvLine("고장종류", $("faultType").value) + pvLine("설비유형", $("equipType").value) +
+      pvLine("전압급", inc.voltage) + pvLine("지역본부", inc.region) + pvLine("설비명", $("assetName").value) +
+      pvLine("발생일시", inc.occurred_at) + pvLine("날씨", inc.weather);
+
+    var b2 = pvLine(inc.cause_label || "고장원인", inc.cause) + pvLine("계전기 동작사항", inc.relay_operation) +
+      pvLine("정전 여부", outageOn ? inc.outage : "없음") + pvLine("언론보도/민원", mediaOn ? inc.media : "없음");
+    kv.forEach(function(k){ b2 += pvLine(k.label || "특이사항", k.value); });
+
+    var b3 = pvLine("고장 흐름", inc.flow.filter(Boolean).join(" → "));
+    if(actions.length){ actions.forEach(function(a){ b3 += pvLine("조치", (a.time ? a.time + "  " : "") + a.text); }); }
+    else { b3 += pvLine("조치/복구 경과", null); }
+    b3 += pvLine("이벤트 발생내역", events.length ? (events.length + "건 등록됨") : null);
+
+    var b4 = "";
+    equip.forEach(function(e){ b4 += pvLine(e.name || "설비", [e.spec, e.made, e.maker, e.inspection].filter(Boolean).join(" / ")); });
+    b4 += pvLine("재발방지대책", inc.plan) + pvLine("간이단선도 캡션", inc.diagram_caption) +
+      pvLine("정지설비 상세", inc.stopped_equipment) +
+      pvLine("현장사진", photos.length ? (photos.length + "장 등록 (" + photos.filter(function(p){ return p.data; }).length + "장 첨부완료)") : null);
+
+    $("previewText").innerHTML =
+      pvBlock(1, "기본 정보", b1) + pvBlock(2, "고장 상황", b2) +
+      pvBlock(3, "원인 및 조치", b3) + pvBlock(4, "설비/사진", b4);
+  }
+
   var previewTimer = null;
   function schedulePreview(){
     if(previewTimer) clearTimeout(previewTimer);
     previewTimer = setTimeout(function(){
-      $("previewText").textContent = buildTextPreview();
+      renderStepPreviewBlocks();
       $("previewJson").textContent = JSON.stringify(buildSchemaForJson(), null, 2);
       updateProgress();
       saveDraft();
@@ -834,7 +1034,7 @@ footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:
 
   $("copyBtn").addEventListener("click", function(){
     var active = $("ptabJson").dataset.active === "true" ? "json" : "text";
-    var text = active === "json" ? $("previewJson").textContent : $("previewText").textContent;
+    var text = active === "json" ? $("previewJson").textContent : buildTextPreview();
     function flash(){ var f = $("copyFlash"); f.dataset.show = "true"; setTimeout(function(){ f.dataset.show = "false"; }, 1400); }
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(flash).catch(function(){ fallbackCopy(text, flash); }); }
     else { fallbackCopy(text, flash); }
@@ -999,9 +1199,42 @@ def _section_heading(doc, number, title):
     doc.add_paragraph(f"{number}. {title}", char_pr_id_ref=sid)
 
 
+def _split_trailing_remark(text):
+    """끝에 붙은 최상위 괄호 설명(예: '...(날씨 : 맑음)')을 본문과 분리한다."""
+    t = text.rstrip()
+    if not t.endswith(")"):
+        return text, ""
+    depth = 0
+    open_idx = None
+    for i, ch in enumerate(t):
+        if ch == "(":
+            if depth == 0:
+                open_idx = i
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+    if open_idx is None or depth != 0:
+        return text, ""
+    return t[:open_idx].rstrip(), t[open_idx:]
+
+
+def _emphasized_line(doc, text, *, size, prefix=""):
+    """prefix(일반) + 본문값(볼드) + 끝 괄호설명(일반) 형태로 한 줄을 구성한다."""
+    main, remark = _split_trailing_remark(str(text))
+    sid = _style(doc, size=size)
+    bsid = _style(doc, size=size, bold=True)
+    p = doc.add_paragraph("", char_pr_id_ref=sid, include_run=False)
+    if prefix:
+        p.add_run(prefix, char_pr_id_ref=sid)
+    if main:
+        p.add_run(main, char_pr_id_ref=bsid)
+    if remark:
+        p.add_run((" " if main else "") + remark, char_pr_id_ref=sid)
+    return p
+
+
 def _label_line(doc, label, value):
-    sid = _style(doc, size=12)
-    doc.add_paragraph(f"□  {label} : {value}", char_pr_id_ref=sid)
+    _emphasized_line(doc, value, size=12, prefix=f"□  {label} : ")
 
 
 def _text_line(doc, text, *, size=12, bold=False, color=BLACK):
@@ -1091,29 +1324,78 @@ def _events_table(doc, events):
         for i, ev in enumerate(events, 1):
             vals = [ev.get("time", ""), ev.get("point", ""), ev.get("status", ""), ev.get("note", "")]
             for j, v in enumerate(vals):
-                align = "LEFT" if j == 1 else "CENTER"
-                _cell_text_centered(doc, table.cell(i, j), v, char_pr_id_ref=bsid, align=align)
+                _cell_text_centered(doc, table.cell(i, j), v, char_pr_id_ref=bsid, align="CENTER")
     else:
         _cell_text_centered(doc, table.cell(1, 0), "", char_pr_id_ref=bsid)
 
 
-def _photos_section(doc, photos):
-    photos = list(photos)
-    while len(photos) < 4:
-        photos.append({"title": f"현장사진 {len(photos) + 1}", "data": None, "format": None})
-    cap_table = doc.add_table(2, 2)
-    cap_table.set_column_widths([50, 50])
-    csid = _style(doc, font=FONT_HEAD, bold=True, size=11.5)
-    for idx, item in enumerate(photos[:4]):
-        r, c_idx = divmod(idx, 2)
-        cap_table.set_cell_shading(r, c_idx, LIGHT_BLUE)
-        _cell_text_centered(doc, cap_table.cell(r, c_idx), item.get("title", ""), char_pr_id_ref=csid)
+def _image_dimensions(data, fmt):
+    """PNG/JPEG 원본 픽셀 크기를 표준 라이브러리만으로 읽는다(Pyodide 호환)."""
+    fmt = (fmt or "").lower()
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+            w = int.from_bytes(data[16:20], "big")
+            h = int.from_bytes(data[20:24], "big")
+            if w > 0 and h > 0:
+                return w, h
+        elif fmt in ("jpg", "jpeg") or data[:2] == b"\xff\xd8":
+            i, n = 2, len(data)
+            while i + 9 < n:
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                if marker == 0xD8 or 0xD0 <= marker <= 0xD7:
+                    i += 2
+                    continue
+                if marker == 0xD9:
+                    break
+                seg_len = int.from_bytes(data[i + 2:i + 4], "big")
+                if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+                              0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                    h = int.from_bytes(data[i + 5:i + 7], "big")
+                    w = int.from_bytes(data[i + 7:i + 9], "big")
+                    if w > 0 and h > 0:
+                        return w, h
+                    break
+                i += 2 + seg_len
+    except Exception:
+        pass
+    return None
 
-    for item in photos[:4]:
+
+# 사진 1장을 끼워넣을 수 있는 최대 박스(mm). 원본 비율은 그대로 유지한 채
+# 이 박스 안에 들어오도록 리사이징만 한다(크롭·강제비율 왜곡 없음).
+_PHOTO_MAX_W_MM = 150.0
+_PHOTO_MAX_H_MM = 170.0
+
+
+def _fit_photo_size_mm(data, fmt):
+    dims = _image_dimensions(data, fmt)
+    if not dims:
+        return _PHOTO_MAX_W_MM, _PHOTO_MAX_W_MM * 0.75
+    w, h = dims
+    width_mm, height_mm = _PHOTO_MAX_W_MM, _PHOTO_MAX_W_MM * h / w
+    if height_mm > _PHOTO_MAX_H_MM:
+        height_mm = _PHOTO_MAX_H_MM
+        width_mm = _PHOTO_MAX_H_MM * w / h
+    return width_mm, height_mm
+
+
+def _photos_section(doc, photos):
+    photos = list(photos) or [{"title": "현장사진 1", "data": None, "format": None}]
+    csid = _style(doc, font=FONT_HEAD, bold=True, size=11.5)
+    for item in photos:
+        cap_table = doc.add_table(1, 1)
+        cap_table.set_cell_shading(0, 0, LIGHT_BLUE)
+        _cell_text_centered(doc, cap_table.cell(0, 0), item.get("title", ""), char_pr_id_ref=csid)
+
         data = item.get("data")
         fmt = item.get("format")
         if data and fmt:
-            doc.add_picture(bytes(data), fmt, width_mm=70, height_mm=44, align="CENTER")
+            data = bytes(data)
+            width_mm, height_mm = _fit_photo_size_mm(data, fmt)
+            doc.add_picture(data, fmt, width_mm=width_mm, height_mm=height_mm, align="CENTER")
         else:
             sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)
             p = doc.add_paragraph(f"[{item.get('title','현장사진')} 미첨부]", char_pr_id_ref=sid)
@@ -1151,7 +1433,7 @@ def build_report(data: dict) -> HwpxDocument:
 
     _section_heading(doc, 4, incident.get("actions_title", "동작 및 조치사항"))
     for action in incident.get("actions", []) or []:
-        _text_line(doc, "□  " + action, size=11.5)
+        _emphasized_line(doc, action, size=11.5, prefix="□  ")
 
     _section_heading(doc, 5, "향후 계획")
     _text_line(doc, "□  " + incident.get("plan", ""), size=11.5)
@@ -1286,6 +1568,106 @@ def build_report(data: dict) -> HwpxDocument:
       navigator.serviceWorker.register("./sw.js").catch(function(){ /* file:// 등에서는 정상적으로 실패함 */ });
     });
   }
+
+  // ====================== 단계별 마법사 내비게이션 ======================
+  var TOTAL_STEPS = 5;
+  var STEP_LABELS = ["기본 정보", "고장 상황", "원인 및 조치", "설비/사진", "확인 및 생성"];
+  var STEP_REQUIRED = {
+    1: ["faultType", "equipType", "voltage", "region", "assetName", "occurredAt", "weather"],
+    2: ["cause"]
+  };
+  var currentStep = 1;
+
+  function prefersReducedMotion(){
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function isFieldEmpty(id){
+    if(id === "weather") return !weatherValue();
+    var el = $(id);
+    return !el || !el.value || !el.value.trim();
+  }
+
+  function firstMissingInStep(step){
+    var ids = STEP_REQUIRED[step] || [];
+    for(var i=0;i<ids.length;i++){ if(isFieldEmpty(ids[i])) return ids[i]; }
+    return null;
+  }
+
+  function clearStepError(){
+    var box = $("stepError");
+    box.hidden = true;
+    box.textContent = "";
+    document.querySelectorAll(".invalid").forEach(function(el){ el.classList.remove("invalid"); });
+  }
+
+  function josaEulReul(word){
+    var ch = (word || "").charAt(word.length - 1);
+    var code = ch.charCodeAt(0) - 0xAC00;
+    if(code < 0 || code > 11171) return "를";
+    return (code % 28 === 0) ? "를" : "을";
+  }
+
+  function showStepError(fieldId){
+    var box = $("stepError");
+    box.hidden = false;
+    var label = FIELD_LABELS[fieldId] || fieldId;
+    box.textContent = "⚠ " + label + josaEulReul(label) + " 입력해 주세요.";
+    var el = $(fieldId);
+    if(el){
+      el.classList.add("invalid");
+      el.focus({ preventScroll: true });
+      el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+    }
+  }
+
+  function updateStepperUI(){
+    document.querySelectorAll("#stepTrack li").forEach(function(li){
+      var n = Number(li.dataset.step);
+      li.dataset.state = (n < currentStep) ? "done" : (n === currentStep) ? "current" : "upcoming";
+    });
+    $("stepMetaLabel").innerHTML = "<b>" + currentStep + " / " + TOTAL_STEPS + "</b>" + STEP_LABELS[currentStep - 1];
+    $("stepPrevBtn").disabled = (currentStep === 1);
+    var nextBtn = $("stepNextBtn");
+    nextBtn.hidden = (currentStep === TOTAL_STEPS);
+    nextBtn.textContent = (currentStep === TOTAL_STEPS - 1) ? "확인·생성으로 →" : "다음 →";
+    var announce = $("stepAnnounce");
+    if(announce) announce.textContent = currentStep + "단계, " + STEP_LABELS[currentStep - 1] + "로 이동했습니다.";
+  }
+
+  function goToStep(n){
+    n = Math.max(1, Math.min(TOTAL_STEPS, n));
+    currentStep = n;
+    document.querySelectorAll(".step-panel").forEach(function(panel){
+      panel.hidden = (Number(panel.dataset.step) !== n);
+    });
+    clearStepError();
+    updateStepperUI();
+    if(n === TOTAL_STEPS){ activatePreviewTab("Gen"); }
+    var panel = document.getElementById("step" + n);
+    if(panel && panel.scrollIntoView){
+      panel.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }
+
+  $("previewText").addEventListener("click", function(e){
+    var btn = e.target.closest(".pv-edit-btn");
+    if(!btn) return;
+    goToStep(Number(btn.dataset.gotoStep));
+  });
+
+  $("stepPrevBtn").addEventListener("click", function(){ goToStep(currentStep - 1); });
+  $("stepNextBtn").addEventListener("click", function(){
+    var missing = firstMissingInStep(currentStep);
+    if(missing){ showStepError(missing); return; }
+    goToStep(currentStep + 1);
+  });
+  document.getElementById("reportForm").addEventListener("input", clearStepError);
+  document.getElementById("reportForm").addEventListener("change", clearStepError);
+
+  goToStep(1);
 })();</script>
 </body>
 </html>
