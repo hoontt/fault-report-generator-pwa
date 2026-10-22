@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>고장보고서 생성기 (휴대폰 단독실행)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#d9650b">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="고장보고서">
+<style>:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eceff3; --surface-3:#e3e7ee;
+  --fg:#17202c; --fg-muted:#5c6679; --fg-faint:#8893a3;
+  --border:#d9dee6; --border-strong:#c3cad6;
+  --accent:#d9650b; --accent-fg:#ffffff; --accent-soft:#fcecdc; --accent-soft-fg:#8a3c06;
+  --ok:#1a7a42; --ok-soft:#e3f5e9;
+  --warn:#9a5b06; --warn-soft:#fdf0d9;
+  --danger:#b4231f; --danger-soft:#fbe5e4;
+  --focus:#1c4ed8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10141c; --surface:#171d28; --surface-2:#1e2530; --surface-3:#262f3c;
+    --fg:#e8ecf3; --fg-muted:#9aa5b8; --fg-faint:#6b7689;
+    --border:#2b3340; --border-strong:#3a4452;
+    --accent:#ef8b3c; --accent-fg:#1a1206; --accent-soft:#2c1e0e; --accent-soft-fg:#ffc98c;
+    --ok:#53c17c; --ok-soft:#143322;
+    --warn:#e8b14e; --warn-soft:#3a2c0d;
+    --danger:#f0746f; --danger-soft:#3a1816;
+    --focus:#6f94ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10141c; --surface:#171d28; --surface-2:#1e2530; --surface-3:#262f3c;
+  --fg:#e8ecf3; --fg-muted:#9aa5b8; --fg-faint:#6b7689;
+  --border:#2b3340; --border-strong:#3a4452;
+  --accent:#ef8b3c; --accent-fg:#1a1206; --accent-soft:#2c1e0e; --accent-soft-fg:#ffc98c;
+  --ok:#53c17c; --ok-soft:#143322;
+  --warn:#e8b14e; --warn-soft:#3a2c0d;
+  --danger:#f0746f; --danger-soft:#3a1816;
+  --focus:#6f94ff;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font-family:'Noto Sans KR','IBM Plex Sans KR',sans-serif;line-height:1.5}
+h1,h2,h3,legend{font-family:'IBM Plex Sans KR','Noto Sans KR',sans-serif;text-wrap:balance}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+.app{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 48px}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface);margin-bottom:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{flex:0 0 auto;width:38px;height:38px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent-soft-fg)}
+.brand-mark svg{width:20px;height:20px}
+.brand-title{font-weight:700;font-size:16px;letter-spacing:-.01em}
+.brand-sub{font-size:12.5px;color:var(--fg-muted)}
+.topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.progress-chip{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:12.5px;padding:6px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--fg-muted)}
+.progress-chip[data-complete="true"]{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+
+.pipeline-note{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:12px;background:var(--accent-soft);color:var(--accent-soft-fg);font-size:12.5px;border:1px solid transparent;margin-bottom:14px}
+.pipeline-note code{font-family:'IBM Plex Mono',monospace;background:rgba(0,0,0,.08);padding:1px 4px;border-radius:4px}
+
+/* 휴대폰 화면비율 기준 — 입력 위, 미리보기 아래로 세로 스택. 폭 넓은 화면에서도
+   같은 세로 흐름을 유지하되 가운데 정렬 + 최대폭만 넓혀서 보기 편하게 한다. */
+.layout{display:flex;flex-direction:column;gap:16px}
+.pane-preview{display:flex;flex-direction:column}
+.preview-card{max-height:none}
+
+fieldset.section{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px 16px 18px;margin:0 0 14px;min-width:0}
+fieldset.section legend{display:flex;align-items:center;gap:10px;padding:0 4px;font-size:14.5px;font-weight:700}
+.badge-num{flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:var(--accent);color:var(--accent-fg);font-family:'IBM Plex Mono',monospace;font-size:12px;display:flex;align-items:center;justify-content:center}
+.section-note{font-size:12.5px;color:var(--fg-muted);margin:2px 0 14px;padding-left:34px}
+
+.field-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
+.field-row.cols-3{grid-template-columns:repeat(3,1fr)}
+.field-row.cols-4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:560px){ .field-row,.field-row.cols-3,.field-row.cols-4{grid-template-columns:1fr} }
+
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:12.5px;font-weight:600;color:var(--fg-muted);display:flex;align-items:center;gap:6px}
+.req-dot{width:6px;height:6px;border-radius:999px;background:var(--danger);flex:0 0 auto}
+.opt-tag{font-size:10.5px;font-weight:500;color:var(--fg-faint);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+.schema-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--fg-faint)}
+
+input[type=text],input[type=number],input[type=datetime-local],select,textarea{
+  width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);font:inherit;font-size:13.5px
+}
+textarea{resize:vertical;min-height:50px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:transparent}
+input::placeholder,textarea::placeholder{color:var(--fg-faint)}
+
+.radio-group{display:flex;gap:14px;flex-wrap:wrap;padding-top:2px}
+.radio-group label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--fg)}
+.radio-group input{accent-color:var(--accent)}
+
+.subblock{border-left:2px solid var(--border);padding-left:12px;margin:4px 0 2px;display:grid;gap:10px}
+.subblock[hidden]{display:none}
+
+.rows{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.row-item{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center}
+.row-item.event{grid-template-columns:1fr 1.4fr 0.9fr 1.2fr auto}
+.row-item.equip{grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 0.9fr auto}
+.row-item.kv{grid-template-columns:1fr 1.6fr auto}
+.row-item.photo{grid-template-columns:auto 1fr auto;align-items:center}
+@media (max-width:620px){ .row-item,.row-item.event,.row-item.equip,.row-item.kv{grid-template-columns:1fr} }
+.row-remove{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--danger);cursor:pointer;font-size:15px;line-height:1}
+.row-remove:hover{background:var(--danger-soft)}
+.row-hint{font-size:10.5px;color:var(--fg-faint)}
+
+.flow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:620px){ .flow-grid{grid-template-columns:1fr 1fr} }
+.flow-step{display:flex;flex-direction:column;gap:4px}
+.flow-step span{font-size:10.5px;color:var(--fg-faint);font-family:'IBM Plex Mono',monospace}
+
+.btn{font:inherit;font-weight:600;font-size:13px;padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--border-strong)}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn-accent:hover{filter:brightness(1.06)}
+.btn-accent:disabled{opacity:.55;cursor:not-allowed;filter:none}
+.btn-ghost{background:transparent}
+.btn-sm{padding:6px 10px;font-size:12.5px}
+.btn-add{align-self:flex-start}
+
+.photo-thumb-wrap{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.photo-thumb{width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex:0 0 auto;background:var(--surface-3)}
+.photo-pick-btn{font-size:11.5px;padding:7px 10px}
+
+.ocr-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ocr-raw{max-height:160px;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11.5px;margin:0 0 8px}
+
+.preview-card{border:1px solid var(--border);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;min-height:0;flex:1}
+.preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.preview-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.ptab{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-muted);cursor:pointer}
+.ptab[data-active="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.preview-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.preview-body{padding:14px 16px;overflow:auto;min-height:0}
+.preview-text{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.1px;white-space:pre-wrap;word-break:break-word;color:var(--fg);margin:0}
+.view[hidden]{display:none}
+.missing{margin:0;padding:12px 16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--warn);background:var(--warn-soft);display:none}
+.missing[data-show="true"]{display:block}
+.missing ul{margin:6px 0 0;padding-left:18px}
+
+.copy-flash{font-size:11.5px;color:var(--ok);opacity:0;transition:opacity .25s}
+.copy-flash[data-show="true"]{opacity:1}
+
+.howto{border-top:1px solid var(--border);padding:12px 16px;font-size:11.5px;color:var(--fg-muted)}
+.howto code{font-family:'IBM Plex Mono',monospace;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+
+.gen-box{display:flex;flex-direction:column;gap:12px}
+.gen-status{font-family:'IBM Plex Mono',monospace;font-size:11.5px;white-space:pre-wrap;color:var(--fg-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:60px}
+.gen-status .ok{color:var(--ok)}
+.gen-status .err{color:var(--danger)}
+.gen-status .warn{color:var(--warn)}
+.gen-download{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.gen-download a{font-weight:700}
+.gen-note{font-size:11.5px;color:var(--fg-faint)}
+.spinner{width:14px;height:14px;border-radius:999px;border:2px solid var(--border);border-top-color:var(--accent);display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+footer.hint{font-size:11.5px;color:var(--fg-faint);text-align:center;margin-top:18px}</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      </span>
+      <div>
+        <div class="brand-title">고장보고서 생성기 (휴대폰 단독실행판)</div>
+        <div class="brand-sub">입력부터 HWPX 저장까지 이 페이지 안에서 전부 끝납니다. PC·한컴오피스·서버 불필요.</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="progress-chip" id="progressChip">필수 0/8</span>
+    </div>
+  </header>
+
+  <div class="pipeline-note">
+    <span>ⓘ</span>
+    <span>이 파일은 Claude 링크가 아니라 <b>이 기기에 저장된 독립 HTML</b>입니다. 입력을 마치고
+    아래 "HWPX 생성" 탭의 버튼을 누르면, 브라우저 안에서 파이썬(Pyodide)이 실행되어
+    <code>python-hwpx</code>로 진짜 .hwpx 파일을 만들고 바로 다운로드됩니다. 최초 1회만
+    인터넷에서 파이썬 엔진(약 20~30MB)을 내려받고, 그 다음부터는 캐시돼 더 빠릅니다.</span>
+  </div>
+
+  <main class="layout">
+    <section class="pane pane-form" id="paneForm">
+      <form id="reportForm">
+
+        <fieldset class="section">
+          <legend><span class="badge-num">0</span>분류</legend>
+          <div class="field-row cols-3">
+            <div class="field">
+              <label for="faultType"><span class="req-dot"></span>고장종류</label>
+              <select id="faultType">
+                <option value="">선택 안 함</option>
+                <option>외물접촉형</option>
+                <option>보호계전기오동작형</option>
+                <option>절연파괴열화형</option>
+                <option>작업과실형</option>
+                <option>고장파급형</option>
+                <option>시공불량제3자형</option>
+                <option>자연재해형</option>
+                <option>제작불량형</option>
+                <option>원인불명형</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="equipType"><span class="req-dot"></span>설비유형</label>
+              <select id="equipType">
+                <option value="">선택</option>
+                <option value="송전선로">송전선로(T/L)</option>
+                <option value="변압기">변압기</option>
+                <option value="모선">모선</option>
+                <option value="배전선로">배전선로(변전소 내)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="voltage"><span class="req-dot"></span>전압급</label>
+              <select id="voltage">
+                <option value="">선택</option>
+                <option>765kV</option><option>345kV</option><option>154kV</option><option>23kV</option>
+              </select>
+            </div>
+          </div>
+          <p class="section-note" style="padding-left:0">고장종류를 고르면 흐름도·재발방지·사진·이벤트 칸에
+          해당 유형의 기본 문구가 채워집니다(모두 수정 가능).</p>
+        </fieldset>
+
+        <fieldset class="section">
+          <legend><span class="badge-num">1</span>필수</legend>
+          <div class="field-row">
+            <div class="field">
+              <label for="region"><span class="req-dot"></span>지역본부</label>
+              <input type="text" id="region" placeholder="예: 광주전남">
+            </div>
+            <div class="field">
+              <label for="assetName"><span class="req-dot"></span>설비명</label>
+              <input type="text" id="assetName" placeholder="예: 해남변전소 2변압기, 화성남양#1T/L">
+            </div>
+          </div>
+          <div class="field-row cols-3">
+            <div class="field">
+              <label for="occurredAt"><span class="req-dot"></span>발생일시</label>
+              <input type="datetime-local" id="occurredAt" step="1">
+            </div>
+            <div class="field">
+              <label for="weather"><span class="req-dot"></span>날씨</label>
+              <select id="weather">
+                <option value="">선택</option>
+                <option>맑음</option><option>흐림</option><option>비</option><option>눈</option>
+                <option>강풍</option><option value="__custom">직접입력(수치 포함)</option>
+              </select>
+            </div>
+            <div class="field" id="weatherCustomField" hidden>
+              <label for="weatherCustom">날씨 상세(수치)</label>
+              <input type="text" id="weatherCustom" placeholder="예: 강풍 6.0m/s">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="cause"><span class="req-dot"></span>고장원인</label>
+              <textarea id="cause" placeholder="예: 해남D/L 차단기 부동작에 의한 2변압기 파급정지"></textarea>
+            </div>
+            <div class="field">
+              <label for="relayAction">계전기 동작사항</label>
+              <textarea id="relayAction" placeholder="예: 해남D/L OCR 동작, 2변압기 51S 동작"></textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="section">
+          <legend><span class="badge-num">2</span>상황에 따라 필수</legend>
+          <div class="field">
+            <label>정전 여부</label>
+            <div class="radio-group">
+              <label><input type="radio" name="outage" value="없음" checked>정전없음</label>
+              <label><input type="radio" name="outage" value="있음">정전있음</label>
+            </div>
+          </div>
+          <div class="subblock" id="outageBlock" hidden>
+            <div class="field-row cols-4">
+              <div class="field"><label for="outageMin">정전시간(분)</label><input type="number" id="outageMin" min="0"></div>
+              <div class="field"><label for="outageMw">정전부하(MW)</label><input type="number" id="outageMw" min="0" step="0.1"></div>
+              <div class="field"><label for="outageRegion">정전지역</label><input type="text" id="outageRegion" placeholder="예: 대구수성구 일대"></div>
+              <div class="field"><label for="outageHouseholds">세대수</label><input type="number" id="outageHouseholds" min="0"></div>
+            </div>
+          </div>
+
+          <div class="field" style="margin:10px 0">
+            <label>언론보도/민원 여부</label>
+            <div class="radio-group">
+              <label><input type="radio" name="media" value="없음" checked>없음</label>
+              <label><input type="radio" name="media" value="있음">있음</label>
+            </div>
+          </div>
+          <div class="subblock" id="mediaBlock" hidden>
+            <div class="field-row">
+              <div class="field"><label for="mediaOutlet">매체명</label><input type="text" id="mediaOutlet" placeholder="예: 연합뉴스"></div>
+              <div class="field"><label for="mediaCount">건수</label><input type="number" id="mediaCount" min="0"></div>
+            </div>
+          </div>
+
+          <div class="field" id="equipTableField">
+            <label>설비 제원(변압기·모선형)</label>
+            <div class="rows" id="equipRows"></div>
+            <button type="button" class="btn btn-sm btn-add" id="addEquipRow">+ 설비 추가</button>
+          </div>
+
+          <div class="field" style="margin-top:12px">
+            <label>고장 흐름 4단계</label>
+            <div class="flow-grid" id="flowGrid">
+              <div class="flow-step"><span>1</span><input type="text" class="flow-input" data-i="0"></div>
+              <div class="flow-step"><span>2</span><input type="text" class="flow-input" data-i="1"></div>
+              <div class="flow-step"><span>3</span><input type="text" class="flow-input" data-i="2"></div>
+              <div class="flow-step"><span>4</span><input type="text" class="flow-input" data-i="3"></div>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:12px">
+            <label>유형별 특이사항</label>
+            <div class="rows" id="kvRows"></div>
+            <button type="button" class="btn btn-sm btn-add" id="addKvRow">+ 항목 추가</button>
+          </div>
+
+          <div class="field" style="margin-top:12px">
+            <label>조치/복구 경과(시간순)</label>
+            <div class="rows" id="actionRows"></div>
+            <button type="button" class="btn btn-sm btn-add" id="addActionRow">+ 조치 항목 추가</button>
+          </div>
+
+          <div class="field" style="margin-top:12px">
+            <label>이벤트 발생내역</label>
+            <p class="row-hint">계전기/모니터 화면을 찍은 사진 한 장이면 자동으로 행이 채워집니다.
+            OCR 결과는 틀릴 수 있으니 채워진 값을 꼭 확인·수정하세요.</p>
+            <div class="ocr-box">
+              <label class="btn btn-sm photo-pick-btn">📷 사진으로 자동입력(OCR)<input type="file" accept="image/*" hidden id="eventOcrPick"></label>
+              <button type="button" class="btn btn-sm btn-ghost" id="eventOcrRawToggle" hidden>인식된 글자 보기</button>
+            </div>
+            <div class="gen-status" id="eventOcrStatus" hidden></div>
+            <pre class="preview-text ocr-raw" id="eventOcrRaw" hidden></pre>
+            <div class="rows" id="eventRows"></div>
+            <button type="button" class="btn btn-sm btn-add" id="addEventRow">+ 이벤트 행 추가</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="section">
+          <legend><span class="badge-num">3</span>선택 <span class="opt-tag">없으면 유형 기본 문구 사용</span></legend>
+          <div class="field-row">
+            <div class="field"><label for="futurePlan">재발방지대책/향후계획</label><textarea id="futurePlan"></textarea></div>
+            <div class="field"><label for="diagramCaption">간이단선도 캡션</label><textarea id="diagramCaption" placeholder="예: 2변압기 정지 / D/L 5개 정지 / 해남D/L 부동작"></textarea></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="towerInfo">철탑/구간 정보(송전선로, 정지설비에 합쳐짐)</label><textarea id="towerInfo" placeholder="예: 15호 철탑, 경간 320m"></textarea></div>
+            <div class="field"><label for="stoppedDetail">정지설비 상세 직접 입력(선택)</label><textarea id="stoppedDetail" placeholder="비우면 전압급+지역본부+설비명으로 자동 구성"></textarea></div>
+          </div>
+
+          <div class="field">
+            <label>현장사진 (여기서 고른 사진이 HWPX 안에 실제로 삽입됩니다)</label>
+            <p class="row-hint">카메라로 바로 찍거나, 카톡으로 받은 사진을 갤러리에서 선택하면 됩니다.
+            이 페이지가 파일을 어디로 보내지 않습니다 — 전부 이 기기 안에서만 처리됩니다.</p>
+            <div class="rows" id="photoRows"></div>
+            <button type="button" class="btn btn-sm btn-add" id="addPhotoRow">+ 사진 항목 추가</button>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+
+    <aside class="pane pane-preview" id="panePreview">
+      <div class="preview-card">
+        <div class="preview-head">
+          <div class="preview-tabs">
+            <button type="button" class="ptab" id="ptabText" data-active="true">요약 미리보기</button>
+            <button type="button" class="ptab" id="ptabJson" data-active="false">JSON</button>
+            <button type="button" class="ptab" id="ptabGen" data-active="false">HWPX 생성</button>
+          </div>
+          <div class="preview-actions">
+            <span class="copy-flash" id="copyFlash">복사됨</span>
+            <button type="button" class="btn btn-sm" id="exampleBtn">예시 불러오기</button>
+            <button type="button" class="btn btn-sm" id="resetBtn">초기화</button>
+            <button type="button" class="btn btn-sm btn-accent" id="copyBtn">복사하기</button>
+          </div>
+        </div>
+        <div class="preview-body">
+          <div class="view" id="viewText"><pre class="preview-text" id="previewText"></pre></div>
+          <div class="view" id="viewJson" hidden><pre class="preview-text" id="previewJson"></pre></div>
+          <div class="view gen-box" id="viewGen" hidden>
+            <button type="button" class="btn btn-accent" id="genBtn">HWPX 만들기 (이 기기에서 바로)</button>
+            <div class="gen-status" id="genStatus">대기 중 — 위 버튼을 누르면 시작합니다. 최초 1회는 파이썬 엔진을 내려받느라 20~40초 정도 걸릴 수 있습니다.</div>
+            <div class="gen-download" id="genDownload" hidden>
+              <a id="genDownloadLink" class="btn btn-accent" download>📄 HWPX 파일 다운로드</a>
+              <span class="gen-note" id="genSizeNote"></span>
+            </div>
+          </div>
+        </div>
+        <div class="missing" id="missingBox">
+          <strong>아직 비어있는 필수 항목</strong>
+          <ul id="missingList"></ul>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="hint">입력 내용은 이 브라우저에만 자동 저장됩니다(초안 임시저장). 사진·JSON 모두 외부로 전송되지 않습니다.</footer>
+</div>
+
+<script>(function(){
+  "use strict";
+  var DRAFT_KEY = "faultReportDraftStandalone_v1";
+  var REQUIRED_IDS = ["faultType","equipType","region","assetName","voltage","occurredAt","weather","cause"];
+  var FIELD_LABELS = {
+    faultType:"고장종류", equipType:"설비유형", region:"지역본부", assetName:"설비명", voltage:"전압급",
+    occurredAt:"발생일시", weather:"날씨", cause:"고장원인"
+  };
+
+  var TYPE_DEFAULTS = {
+    "외물접촉형": { flow:["외물 접촉","보호계전기 동작","자동투입/차단","순시·가압"], plan:"재발방지 설비(조류착지방지장치 등) 설치 및 전후 구간 특별점검", kv:[{label:"접촉물", value:""}], photos:["접촉 흔적","고장 철탑","설비 외관","재발방지 설비"], events:["A측 계전기","B측 계전기","자동투입","가압"], diagramPlaceholderTL:"경과지도 및 계통도 삽입 영역\n\n고장구간 · 철탑번호 · 거리표정 위치를 표시" },
+    "보호계전기오동작형": { flow:["기기 오동작","차단기 개방","설비 정지","점검·복구"], plan:"제작사(제작사명) 합동 기기 오동작 원인분석 및 불량부품 교체", kv:[], photos:["오동작 기기","내부 불량부위","특성시험","교체 작업"], events:["주보호 계전기","후비보호 계전기","차단기","복구 조작"] },
+    "절연파괴열화형": { flow:["내부고장","보호계전기 동작","차단기 개방","분리·가압"], plan:"전력기자재센터·제작사 합동 정밀점검 및 동일유형설비 재발방지대책 수립", kv:[], photos:["절연파괴 부위","아크 흔적","내부 점검","절연 측정"], events:["주보호 계전기","후비보호 계전기","차단기","복구 조작"] },
+    "작업과실형": { flow:["작업·조작","오조작 발생","설비 정지","재투입·가압"], plan:"행위 원인분석 및 작업절차 보강·유사고장 재발방지대책 수립", kv:[{label:"작업/조작 내용", value:""}], photos:["고장 설비","작업 대상","조치 후 상태","안전조치"], events:["주보호 계전기","후비보호 계전기","차단기","복구 조작"] },
+    "고장파급형": { flow:["1차고장","보호장치 부동작","파급정지","분리·복구"], plan:"계전기 부동작(지연동작) 세부원인분석 및 재발방지대책 마련", kv:[], photos:["부동작 계전기","차단기 상태","원인 추정부위","복구 후 설비"], events:["주보호 계전기","후비보호 계전기","차단기","복구 조작"] },
+    "시공불량제3자형": { flow:["공사 작업","설비 접촉·손상","선로 정지","분리·가압"], plan:"관련 부서 합동 세부원인 파악 및 재발방지대책 수립", kv:[{label:"공사 주체", value:""},{label:"공사 내용", value:""}], photos:["공사 현장","직접원인 부위","손상 설비","복구 작업"], events:["A측 계전기","B측 계전기","자동투입","가압"], diagramPlaceholderTL:"경과지도 및 계통도 삽입 영역\n\n고장구간 · 철탑번호 · 거리표정 위치를 표시" },
+    "자연재해형": { flow:["기상 악화","선로 고장","자동투입","순시·복구"], plan:"기상현상 관련 설비보강 검토 및 계절 특별점검 대상 포함", kv:[{label:"기상상황", value:""}], photos:["아크 흔적","기상 피해","고장 철탑","보강 대상"], events:["A측 계전기","B측 계전기","자동투입","가압"], diagramPlaceholderTL:"경과지도 및 계통도 삽입 영역\n\n고장구간 · 철탑번호 · 거리표정 위치를 표시" },
+    "제작불량형": { flow:["부품 결함","보호장치 동작","설비 정지","부품 교체"], plan:"불량부품 자재수배 후 교체 및 제작사(제작사명) 합동 원인분석", kv:[{label:"불량 의심 부품", value:""}], photos:["불량 부품","모델 명판","불량 부위","교체 후 상태"], events:["주보호 계전기","후비보호 계전기","차단기","복구 조작"] },
+    "원인불명형": { flow:["보호계전기 동작","1차 순시","재순시","추가 정밀점검"], plan:"전 구간 도보순시 및 드론 정밀점검 후 원인규명·재발방지대책 수립", kv:[{label:"추정 구간", value:""}], photos:["추정 구간","순시 현장","설비 외관","드론 점검"], events:["A측 계전기","B측 계전기","자동투입","가압"], diagramPlaceholderTL:"경과지도 및 계통도 삽입 영역\n\n고장구간 · 철탑번호 · 거리표정 위치를 표시" }
+  };
+  var TL_LABELS = { overview_title:"고장 개요", equipment_label:"고장설비", outage_title:"정전 및 피해사항", actions_title:"조치사항", diagram_title:"경과지도 및 계통도", cause_label:"고장원인" };
+  var TX_DIAGRAM_TITLE = "간이 단선도 및 고장 범위";
+  var TX_DIAGRAM_PLACEHOLDER = "간이 단선도 삽입 영역\n\n고장설비 · 정지설비 · 차단기 동작범위를 표시";
+
+  function $(id){ return document.getElementById(id); }
+  function isTL(){ return $("equipType").value === "송전선로"; }
+  function weatherValue(){
+    var sel = $("weather").value;
+    if(sel === "__custom") return $("weatherCustom").value.trim();
+    return sel;
+  }
+
+  function makeRemovable(wrap){
+    wrap.querySelector(".row-remove").addEventListener("click", function(){ wrap.remove(); schedulePreview(); });
+    wrap.querySelectorAll("input,select").forEach(function(el){
+      el.addEventListener("input", schedulePreview);
+      el.addEventListener("change", schedulePreview);
+    });
+  }
+
+  function addActionRow(time, text){
+    var wrap = document.createElement("div");
+    wrap.className = "row-item";
+    wrap.innerHTML =
+      '<input type="text" class="act-time" placeholder="시각 (예: 22:18:07)" value="'+ (time||"") +'">' +
+      '<input type="text" class="act-text" placeholder="조치 내용" value="'+ (text||"") +'" style="grid-column:span 2">' +
+      '<button type="button" class="row-remove" aria-label="삭제">×</button>';
+    makeRemovable(wrap);
+    $("actionRows").appendChild(wrap);
+  }
+  function addEventRow(time, point, status, note){
+    var wrap = document.createElement("div");
+    wrap.className = "row-item event";
+    wrap.innerHTML =
+      '<input type="text" class="evt-time" placeholder="발생시간" value="'+ (time||"") +'">' +
+      '<input type="text" class="evt-point" placeholder="포인트명" value="'+ (point||"") +'">' +
+      '<select class="evt-status">' +
+        ['','동작','개방','닫힘','열림','복귀'].map(function(s){ var sel=(s===status)?' selected':''; return '<option value="'+s+'"'+sel+'>'+(s||'상태')+'</option>'; }).join('') +
+      '</select>' +
+      '<input type="text" class="evt-note" placeholder="비고" value="'+ (note||"") +'">' +
+      '<button type="button" class="row-remove" aria-label="삭제">×</button>';
+    makeRemovable(wrap);
+    $("eventRows").appendChild(wrap);
+  }
+  function addEquipRow(name, spec, made, maker, inspection){
+    var wrap = document.createElement("div");
+    wrap.className = "row-item equip";
+    wrap.innerHTML =
+      '<input type="text" class="eq-name" placeholder="설비명" value="'+ (name||"") +'">' +
+      '<input type="text" class="eq-spec" placeholder="규격" value="'+ (spec||"") +'">' +
+      '<input type="text" class="eq-made" placeholder="제작년월" value="'+ (made||"") +'">' +
+      '<input type="text" class="eq-maker" placeholder="제작사" value="'+ (maker||"") +'">' +
+      '<input type="text" class="eq-inspection" placeholder="최근점검" value="'+ (inspection||"") +'">' +
+      '<button type="button" class="row-remove" aria-label="삭제">×</button>';
+    makeRemovable(wrap);
+    $("equipRows").appendChild(wrap);
+  }
+  function addKvRow(label, value){
+    var wrap = document.createElement("div");
+    wrap.className = "row-item kv";
+    wrap.innerHTML =
+      '<input type="text" class="kv-label" placeholder="항목명" value="'+ (label||"") +'">' +
+      '<input type="text" class="kv-value" placeholder="내용" value="'+ (value||"") +'">' +
+      '<button type="button" class="row-remove" aria-label="삭제">×</button>';
+    makeRemovable(wrap);
+    $("kvRows").appendChild(wrap);
+  }
+
+  // 사진 행: 실제 바이트를 보관한다 (wrap._photoBytes: Uint8Array, wrap._photoFormat: 'png'|'jpeg'...)
+  function addPhotoRow(title){
+    var wrap = document.createElement("div");
+    wrap.className = "row-item photo";
+    wrap.innerHTML =
+      '<label class="btn btn-sm photo-pick-btn">사진 선택<input type="file" accept="image/*" hidden class="ph-pick"></label>' +
+      '<input type="text" class="ph-title" placeholder="사진 제목" value="'+ (title||"") +'">' +
+      '<div class="photo-thumb-wrap"><button type="button" class="row-remove" aria-label="삭제">×</button></div>';
+    var pick = wrap.querySelector(".ph-pick");
+    pick.addEventListener("change", function(e){
+      var file = e.target.files[0];
+      if(!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        wrap._photoBytes = new Uint8Array(ev.target.result);
+        var fmt = (file.type.split("/")[1] || "png").toLowerCase();
+        if(fmt === "jpg") fmt = "jpeg";
+        wrap._photoFormat = fmt;
+        var thumbWrap = wrap.querySelector(".photo-thumb-wrap");
+        var old = thumbWrap.querySelector("img.photo-thumb");
+        if(old) old.remove();
+        var img = document.createElement("img");
+        img.className = "photo-thumb";
+        var blob = new Blob([ev.target.result], {type: file.type});
+        img.src = URL.createObjectURL(blob);
+        thumbWrap.insertBefore(img, thumbWrap.firstChild);
+        schedulePreview();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    makeRemovable(wrap);
+    $("photoRows").appendChild(wrap);
+  }
+
+  $("addActionRow").addEventListener("click", function(){ addActionRow(); schedulePreview(); });
+  $("addEventRow").addEventListener("click", function(){ addEventRow(); schedulePreview(); });
+  $("addEquipRow").addEventListener("click", function(){ addEquipRow(); schedulePreview(); });
+  $("addKvRow").addEventListener("click", function(){ addKvRow(); schedulePreview(); });
+  $("addPhotoRow").addEventListener("click", function(){ addPhotoRow(); schedulePreview(); });
+
+  // ====================== 이벤트 발생내역 사진 OCR (Tesseract.js, 전부 기기 내부에서 실행) ======================
+  var tesseractWorker = null;
+
+  function ocrLogStatus(msg, cls){
+    var box = $("eventOcrStatus");
+    box.hidden = false;
+    var line = document.createElement("div");
+    if(cls) line.className = cls;
+    line.textContent = msg;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+  function ocrClearStatus(){ var box = $("eventOcrStatus"); box.innerHTML = ""; box.hidden = true; }
+
+  async function ensureTesseract(){
+    if(window.Tesseract && tesseractWorker) return tesseractWorker;
+    if(!window.Tesseract){
+      ocrLogStatus("OCR 엔진 불러오는 중...");
+      await new Promise(function(resolve, reject){
+        var s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+        s.onload = resolve;
+        s.onerror = function(){ reject(new Error("OCR 엔진 로드 실패 - 인터넷 연결을 확인하세요")); };
+        document.head.appendChild(s);
+      });
+    }
+    if(!tesseractWorker){
+      ocrLogStatus("언어 데이터(한국어+영어) 준비 중... (최초 1회만, 다소 걸릴 수 있음)");
+      tesseractWorker = await window.Tesseract.createWorker("kor+eng");
+    }
+    return tesseractWorker;
+  }
+
+  // 모니터 화면 한 줄을 발생시간/포인트명/상태/비고로 나눈다. OCR 결과는 칸 사이 공백
+  // 폭이 들쭉날쭉하므로, 먼저 "시간 패턴"과 "상태 키워드"를 찾아 떼어내고 남는 글자를
+  // 포인트명/비고로 나누는 방식을 쓴다.
+  var STATUS_WORDS = ["동작","개방","닫힘","열림","복귀"];
+  var TIME_RE = /\d{4}[-./]\d{1,2}[-./]\d{1,2}[ T]\d{1,2}:\d{2}(:\d{2})?|\d{1,2}:\d{2}(:\d{2})?/;
+
+  function parseEventLine(line){
+    var rest = line;
+    var time = "";
+    var tm = rest.match(TIME_RE);
+    if(tm){ time = tm[0]; rest = (rest.slice(0, tm.index) + " " + rest.slice(tm.index + tm[0].length)).trim(); }
+
+    var status = "";
+    for(var i=0;i<STATUS_WORDS.length;i++){
+      var idx = rest.indexOf(STATUS_WORDS[i]);
+      if(idx >= 0){ status = STATUS_WORDS[i]; rest = (rest.slice(0, idx) + " " + rest.slice(idx + status.length)).trim(); break; }
+    }
+
+    var parts = rest.split(/\s{2,}|\t/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var point = "", note = "";
+    if(parts.length >= 2){ point = parts[0]; note = parts.slice(1).join(" "); }
+    else if(parts.length === 1){ point = parts[0]; }
+
+    if(!time && !status && !point) return null;
+    return { time: time, point: point, status: status, note: note };
+  }
+
+  function parseEventText(text){
+    var lines = text.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var rows = [];
+    lines.forEach(function(line){
+      if(/발생시간/.test(line) && /포인트/.test(line)) return; // 표 머리글 줄은 건너뜀
+      var row = parseEventLine(line);
+      if(row) rows.push(row);
+    });
+    return rows;
+  }
+
+  async function runEventOcr(file){
+    ocrClearStatus();
+    try{
+      var worker = await ensureTesseract();
+      ocrLogStatus("이미지 인식 중...");
+      var imgUrl = URL.createObjectURL(file);
+      var result = await worker.recognize(imgUrl);
+      URL.revokeObjectURL(imgUrl);
+      var text = (result && result.data && result.data.text) || "";
+      $("eventOcrRaw").textContent = text.trim() || "(인식된 글자 없음)";
+      $("eventOcrRawToggle").hidden = false;
+      var rows = parseEventText(text);
+      if(rows.length === 0){
+        ocrLogStatus("행을 자동으로 구분하지 못했습니다. '인식된 글자 보기'를 눌러 확인 후 직접 입력해 주세요.", "warn");
+      } else {
+        rows.forEach(function(r){ addEventRow(r.time, r.point, r.status, r.note); });
+        ocrLogStatus(rows.length + "개 행을 채웠습니다. 틀린 값이 있는지 꼭 확인하세요.", "ok");
+        schedulePreview();
+      }
+    }catch(err){
+      ocrLogStatus("오류: " + (err && err.message ? err.message : String(err)), "err");
+      console.error(err);
+    }
+  }
+
+  $("eventOcrPick").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(file) runEventOcr(file);
+    e.target.value = "";
+  });
+  $("eventOcrRawToggle").addEventListener("click", function(){
+    var box = $("eventOcrRaw");
+    box.hidden = !box.hidden;
+    this.textContent = box.hidden ? "인식된 글자 보기" : "인식된 글자 숨기기";
+  });
+
+  function collectRows(containerId, mapper){ return Array.prototype.map.call($(containerId).children, mapper); }
+  function collectActionRows(){
+    return collectRows("actionRows", function(row){ return { time: row.querySelector(".act-time").value.trim(), text: row.querySelector(".act-text").value.trim() }; })
+      .filter(function(r){ return r.time || r.text; });
+  }
+  function collectEventRows(){
+    return collectRows("eventRows", function(row){
+      return { time: row.querySelector(".evt-time").value.trim(), point: row.querySelector(".evt-point").value.trim(),
+        status: row.querySelector(".evt-status").value, note: row.querySelector(".evt-note").value.trim() };
+    }).filter(function(r){ return r.time || r.point || r.status || r.note; });
+  }
+  function collectEquipRows(){
+    return collectRows("equipRows", function(row){
+      return { name: row.querySelector(".eq-name").value.trim(), spec: row.querySelector(".eq-spec").value.trim(),
+        made: row.querySelector(".eq-made").value.trim(), maker: row.querySelector(".eq-maker").value.trim(),
+        inspection: row.querySelector(".eq-inspection").value.trim() };
+    }).filter(function(r){ return r.name || r.spec || r.made || r.maker || r.inspection; });
+  }
+  function collectKvRows(){
+    return collectRows("kvRows", function(row){ return { label: row.querySelector(".kv-label").value.trim(), value: row.querySelector(".kv-value").value.trim() }; })
+      .filter(function(r){ return r.label || r.value; });
+  }
+  function collectPhotoRows(){
+    return Array.prototype.map.call($("photoRows").children, function(row){
+      return { title: row.querySelector(".ph-title").value.trim(), data: row._photoBytes || null, format: row._photoFormat || null };
+    });
+  }
+
+  $("weather").addEventListener("change", function(){ $("weatherCustomField").hidden = (this.value !== "__custom"); schedulePreview(); });
+  document.querySelectorAll('input[name="outage"]').forEach(function(r){ r.addEventListener("change", function(){ $("outageBlock").hidden = (document.querySelector('input[name="outage"]:checked').value !== "있음"); schedulePreview(); }); });
+  document.querySelectorAll('input[name="media"]').forEach(function(r){ r.addEventListener("change", function(){ $("mediaBlock").hidden = (document.querySelector('input[name="media"]:checked').value !== "있음"); schedulePreview(); }); });
+
+  function applyEquipTypeUI(){ $("equipTableField").hidden = isTL(); }
+  $("equipType").addEventListener("change", function(){ applyEquipTypeUI(); schedulePreview(); });
+
+  function applyFaultTypeDefaults(){
+    var t = TYPE_DEFAULTS[$("faultType").value];
+    if(!t) return;
+    document.querySelectorAll(".flow-input").forEach(function(inp, i){ if(!inp.value) inp.value = t.flow[i] || ""; });
+    if(!$("futurePlan").value) $("futurePlan").placeholder = t.plan;
+    if($("kvRows").children.length === 0){ t.kv.forEach(function(kv){ addKvRow(kv.label, kv.value); }); }
+    if($("photoRows").children.length === 0){ t.photos.forEach(function(p){ addPhotoRow(p); }); }
+    if($("eventRows").children.length === 0){ t.events.forEach(function(p){ addEventRow("", p, "", ""); }); }
+  }
+  $("faultType").addEventListener("change", function(){ applyFaultTypeDefaults(); schedulePreview(); });
+
+  function fmtDateTimeDisplay(v){
+    if(!v) return "";
+    var d = new Date(v);
+    if(isNaN(d)) return v;
+    var days = ["일","월","화","수","목","금","토"];
+    function pad(n){ return (n<10?"0":"")+n; }
+    return d.getFullYear()+". "+(d.getMonth()+1)+". "+d.getDate()+"("+days[d.getDay()]+") "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  }
+
+  function buildIncident(){
+    var tl = isTL();
+    var region = $("region").value.trim();
+    var asset = $("assetName").value.trim();
+    var voltage = $("voltage").value;
+    var equipmentTitle = tl ? (asset ? asset + (asset.indexOf("T/L")>=0||asset.indexOf("송전선로")>=0 ? "" : " 송전선로") : "") : asset;
+    var stoppedDetail = $("stoppedDetail").value.trim();
+    var towerInfo = $("towerInfo").value.trim();
+    var stopped = stoppedDetail || [voltage, region, asset].filter(Boolean).join(" ") + (towerInfo ? " / " + towerInfo : "");
+    var outageOn = document.querySelector('input[name="outage"]:checked').value === "있음";
+    var mediaOn = document.querySelector('input[name="media"]:checked').value === "있음";
+    var outageText = outageOn ? ("정전시간 " + ($("outageMin").value||"-") + "분, 정전부하 " + ($("outageMw").value||"-") + "MW, " + ($("outageRegion").value||"-") + " 일대 " + ($("outageHouseholds").value||"-") + "세대") : "정전없음";
+    var mediaText = mediaOn ? (($("mediaOutlet").value||"-") + " 등 " + ($("mediaCount").value||"-") + "건") : "없음";
+    var flow = Array.prototype.map.call(document.querySelectorAll(".flow-input"), function(i){ return i.value.trim(); });
+    while(flow.length < 4) flow.push("");
+    var actions = collectActionRows().map(function(a){ return (a.time?a.time+"  ":"") + a.text; });
+    var equipment = tl ? [] : collectEquipRows();
+    var kv = collectKvRows();
+
+    var incident = {
+      region: region, voltage: voltage, equipment_title: equipmentTitle,
+      occurred_at: fmtDateTimeDisplay($("occurredAt").value), weather: weatherValue(),
+      stopped_equipment: stopped, equipment: equipment,
+      relay_operation: $("relayAction").value.trim(), cause: $("cause").value.trim(),
+      flow: flow, outage: outageText, media: mediaText, actions: actions,
+      plan: $("futurePlan").value.trim() || ($("futurePlan").placeholder || ""),
+      diagram_caption: $("diagramCaption").value.trim()
+    };
+    if(tl){
+      Object.assign(incident, TL_LABELS);
+      var t = TYPE_DEFAULTS[$("faultType").value];
+      incident.diagram_placeholder = (t && t.diagramPlaceholderTL) || "경과지도 및 계통도 삽입 영역";
+    } else {
+      incident.diagram_title = TX_DIAGRAM_TITLE;
+      incident.diagram_placeholder = TX_DIAGRAM_PLACEHOLDER;
+    }
+    if(kv.length) incident.overview_fields = kv;
+    return incident;
+  }
+
+  function buildSchemaForJson(){
+    var inc = buildIncident();
+    var photos = collectPhotoRows().map(function(p){ return { title: p.title, has_image: !!p.data }; });
+    return { incident: inc, events: collectEventRows(), photos: photos };
+  }
+
+  function buildTextPreview(){
+    var inc = buildIncident();
+    var lines = [];
+    lines.push("[" + (inc.region||"{{지역본부}}") + "] " + (inc.voltage||"{{전압급}}") + " " + (inc.equipment_title||"{{설비명}}") + " 정지 보고");
+    lines.push("");
+    lines.push((inc.overview_title||"발생 개요"));
+    lines.push("- 발생일시: " + (inc.occurred_at||"{{발생일시}}") + "  (날씨: " + (inc.weather||"{{날씨}}") + ")");
+    lines.push("- " + (inc.equipment_label||"정지설비") + ": " + (inc.stopped_equipment||""));
+    (inc.overview_fields||[]).forEach(function(f){ lines.push("- " + f.label + ": " + f.value); });
+    if(inc.equipment && inc.equipment.length){
+      lines.push("- 설비 제원:");
+      inc.equipment.forEach(function(e){ lines.push("    " + [e.name,e.spec,e.made,e.maker,e.inspection].filter(Boolean).join(" / ")); });
+    }
+    lines.push("- 계전기 동작: " + (inc.relay_operation||""));
+    lines.push("- " + (inc.cause_label||"정지원인") + ": " + (inc.cause || "{{미입력}}"));
+    lines.push("- 고장 흐름: " + inc.flow.filter(Boolean).join(" → "));
+    lines.push("");
+    lines.push(inc.outage_title||"정전 현황");
+    lines.push("- " + inc.outage);
+    lines.push("");
+    lines.push("언론 및 민원 현황");
+    lines.push("- " + inc.media);
+    lines.push("");
+    lines.push(inc.actions_title||"동작 및 조치사항");
+    if(inc.actions.length){ inc.actions.forEach(function(a){ lines.push("- " + a); }); } else { lines.push("- {{조치 항목을 추가해 주세요}}"); }
+    lines.push("");
+    lines.push("향후 계획");
+    lines.push("- " + inc.plan);
+    lines.push("");
+    lines.push("간이단선도 캡션: " + (inc.diagram_caption || "{{미입력}}"));
+    var events = collectEventRows();
+    var photos = collectPhotoRows();
+    if(events.length || photos.length){
+      lines.push("");
+      lines.push("---");
+      if(events.length){
+        lines.push("붙임: 이벤트 발생내역 (발생시간|포인트명|상태|비고)");
+        events.forEach(function(e){ lines.push("- " + e.time + " | " + e.point + " | " + (e.status||"-") + " | " + e.note); });
+      }
+      if(photos.length){
+        lines.push("붙임: 현장사진 (" + photos.length + "장)");
+        photos.forEach(function(p){ lines.push("- " + p.title + "  " + (p.data ? "(사진 첨부됨)" : "{{미첨부}}")); });
+      }
+    }
+    return lines.join("\n");
+  }
+
+  function updateProgress(){
+    var missing = REQUIRED_IDS.filter(function(id){
+      if(id === "weather") return !weatherValue();
+      var el = $(id);
+      return !el.value || !el.value.trim();
+    });
+    var done = REQUIRED_IDS.length - missing.length;
+    var chip = $("progressChip");
+    chip.textContent = "필수 " + done + "/" + REQUIRED_IDS.length;
+    chip.dataset.complete = (missing.length === 0) ? "true" : "false";
+    var box = $("missingBox"); var list = $("missingList");
+    if(missing.length){ box.dataset.show = "true"; list.innerHTML = missing.map(function(id){ return "<li>" + FIELD_LABELS[id] + "</li>"; }).join(""); }
+    else { box.dataset.show = "false"; list.innerHTML = ""; }
+  }
+
+  var previewTimer = null;
+  function schedulePreview(){
+    if(previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(function(){
+      $("previewText").textContent = buildTextPreview();
+      $("previewJson").textContent = JSON.stringify(buildSchemaForJson(), null, 2);
+      updateProgress();
+      saveDraft();
+    }, 120);
+  }
+
+  function activatePreviewTab(which){
+    ["ptabText","ptabJson","ptabGen"].forEach(function(id){ $(id).dataset.active = "false"; });
+    ["viewText","viewJson","viewGen"].forEach(function(id){ $(id).hidden = true; });
+    $("ptab"+which).dataset.active = "true";
+    $("view"+which).hidden = false;
+  }
+  $("ptabText").addEventListener("click", function(){ activatePreviewTab("Text"); });
+  $("ptabJson").addEventListener("click", function(){ activatePreviewTab("Json"); });
+  $("ptabGen").addEventListener("click", function(){ activatePreviewTab("Gen"); });
+
+  $("copyBtn").addEventListener("click", function(){
+    var active = $("ptabJson").dataset.active === "true" ? "json" : "text";
+    var text = active === "json" ? $("previewJson").textContent : $("previewText").textContent;
+    function flash(){ var f = $("copyFlash"); f.dataset.show = "true"; setTimeout(function(){ f.dataset.show = "false"; }, 1400); }
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(flash).catch(function(){ fallbackCopy(text, flash); }); }
+    else { fallbackCopy(text, flash); }
+  });
+  function fallbackCopy(text, cb){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    document.body.removeChild(ta);
+    if(cb) cb();
+  }
+
+  function clearDynamicRows(){
+    ["actionRows","eventRows","equipRows","kvRows","photoRows"].forEach(function(id){ $(id).innerHTML = ""; });
+    document.querySelectorAll(".flow-input").forEach(function(i){ i.value = ""; });
+  }
+
+  function fillExample(){
+    clearDynamicRows();
+    $("faultType").value = "고장파급형";
+    $("equipType").value = "변압기"; applyEquipTypeUI();
+    $("region").value = "광주전남";
+    $("voltage").value = "154kV";
+    $("assetName").value = "해남변전소 2변압기";
+    $("occurredAt").value = "2026-04-03T22:18:07";
+    $("weather").value = "비"; $("weatherCustomField").hidden = true;
+    $("cause").value = "해남D/L 차단기 부동작에 의한 2변압기 파급정지";
+    $("relayAction").value = "해남D/L OCR 동작, 2변압기 51S 동작";
+    document.querySelector('input[name="outage"][value="없음"]').checked = true; $("outageBlock").hidden = true;
+    document.querySelector('input[name="media"][value="없음"]').checked = true; $("mediaBlock").hidden = true;
+    addEquipRow("2변압기","154kV 45/60MVA","2022. 07","현대","'26. 1(하자점검)");
+    addEquipRow("해남D/L GIS","25.8kV 25kA","2013. 09","광명","'25. 11(조작점검)");
+    var flowVals = ["해남D/L\n고장 발생","해남D/L CB\n부동작","2변압기\n파급정지","고장구간 분리\n변압기 가압"];
+    document.querySelectorAll(".flow-input").forEach(function(i,idx){ i.value = flowVals[idx]; });
+    addActionRow("22:18:07","해남D/L OCR 동작, 차단기 부동작");
+    addActionRow("22:18:11","2변압기 51S 동작 및 2차 4244 CB 개방");
+    addActionRow("22:19:53","해남D/L 4A7 CB 개방, 고장구간 분리");
+    addActionRow("22:20:21","2변압기 2차 4244 CB 투입 및 변압기 가압");
+    addEventRow("2026-04-03 22:18:07","해남D/L OCR","동작","차단기 부동작");
+    addEventRow("2026-04-03 22:18:11","#2M.Tr 51S","동작","");
+    addEventRow("2026-04-03 22:18:11","#2M.Tr 2차 4244 CB","열림","#2M.Tr 정지");
+    addEventRow("2026-04-03 22:19:53","해남D/L 4A7 CB","열림","고장구간 분리");
+    addEventRow("2026-04-03 22:20:21","#2M.Tr 2차 4244 CB","닫힘","변압기 가압");
+    addPhotoRow("23kV 해남D/L GIS");
+    addPhotoRow("GIS 명판");
+    addPhotoRow("23kV 해남D/L 계전기");
+    addPhotoRow("2변압기 51S 계전기");
+    $("futurePlan").value = "차단기 부동작 원인분석 및 재발방지대책 수립";
+    $("diagramCaption").value = "2변압기 정지 / D/L 5개 정지 / 해남D/L 차단기 부동작";
+    schedulePreview();
+  }
+  $("exampleBtn").addEventListener("click", fillExample);
+
+  $("resetBtn").addEventListener("click", function(){
+    document.getElementById("reportForm").reset();
+    clearDynamicRows();
+    $("weatherCustomField").hidden = true; $("outageBlock").hidden = true; $("mediaBlock").hidden = true;
+    applyEquipTypeUI();
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+    schedulePreview();
+  });
+
+  var TEXT_FIELD_IDS = ["faultType","equipType","region","assetName","voltage","occurredAt","weather","weatherCustom",
+    "cause","relayAction","outageMin","outageMw","outageRegion","outageHouseholds","mediaOutlet","mediaCount",
+    "futurePlan","diagramCaption","towerInfo","stoppedDetail"];
+
+  function saveDraft(){
+    try{
+      var data = { fields:{}, actions:collectActionRows(), events:collectEventRows(),
+        equip:collectEquipRows(), kv:collectKvRows(),
+        photoTitles: Array.prototype.map.call($("photoRows").children, function(row){ return row.querySelector(".ph-title").value; }),
+        flow: Array.prototype.map.call(document.querySelectorAll(".flow-input"), function(i){return i.value;}) };
+      TEXT_FIELD_IDS.forEach(function(id){ data.fields[id] = $(id).value; });
+      data.outage = document.querySelector('input[name="outage"]:checked').value;
+      data.media = document.querySelector('input[name="media"]:checked').value;
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+    }catch(e){ /* storage unavailable, or photo bytes too large for localStorage - ignore, form state only */ }
+  }
+  function loadDraft(){
+    var raw = null;
+    try{ raw = localStorage.getItem(DRAFT_KEY); }catch(e){ return false; }
+    if(!raw) return false;
+    try{
+      var data = JSON.parse(raw);
+      Object.keys(data.fields||{}).forEach(function(id){ var el = $(id); if(el) el.value = data.fields[id]; });
+      if(data.outage){ var r = document.querySelector('input[name="outage"][value="'+data.outage+'"]'); if(r) r.checked = true; $("outageBlock").hidden = (data.outage !== "있음"); }
+      if(data.media){ var r2 = document.querySelector('input[name="media"][value="'+data.media+'"]'); if(r2) r2.checked = true; $("mediaBlock").hidden = (data.media !== "있음"); }
+      $("weatherCustomField").hidden = ($("weather").value !== "__custom");
+      applyEquipTypeUI();
+      (data.actions||[]).forEach(function(a){ addActionRow(a.time, a.text); });
+      (data.events||[]).forEach(function(e){ addEventRow(e.time, e.point, e.status, e.note); });
+      (data.equip||[]).forEach(function(e){ addEquipRow(e.name, e.spec, e.made, e.maker, e.inspection); });
+      (data.kv||[]).forEach(function(k){ addKvRow(k.label, k.value); });
+      (data.photoTitles||[]).forEach(function(t){ addPhotoRow(t); });
+      if(data.flow){ document.querySelectorAll(".flow-input").forEach(function(i, idx){ i.value = data.flow[idx] || ""; }); }
+      return true;
+    }catch(e){ return false; }
+  }
+
+  document.getElementById("reportForm").addEventListener("input", schedulePreview);
+  document.getElementById("reportForm").addEventListener("change", schedulePreview);
+
+  var hadDraft = false;
+  try{ hadDraft = loadDraft(); }catch(e){}
+  if(!hadDraft){ applyEquipTypeUI(); }
+  schedulePreview();
+
+  // ====================== HWPX 생성 (Pyodide) ======================
+  var PY_BUILDER_SRC = String.raw`# -*- coding: utf-8 -*-
+"""
+generate_fault_report.py(python-docx)의 레이아웃을 python-hwpx로 직접 재현한다.
+v2: 폰트 지정(휴먼명조/HY헤드라인M), 표 셀 가운데정렬, 흐름도 줄바꿈 수정.
+"""
+from hwpx.document import HwpxDocument
+
+FONT_BODY = "휴먼명조"
+FONT_HEAD = "HY헤드라인M"
+
+BLUE = "#356AA0"
+LIGHT_BLUE = "#D9E2F3"
+LIGHT_GRAY = "#D9D9D9"
+GREEN = "#B7DDB5"
+WHITE = "#FFFFFF"
+BLACK = "#000000"
+GRAY_TEXT = "#7F7F7F"
+ARROW_GRAY = "#A6A6A6"
+
+
+def _style(doc, *, font=FONT_BODY, **kw):
+    return doc.ensure_run_style(font=font, **kw)
+
+
+def _center(doc, p):
+    doc.styles.apply_paragraph_format(paragraphs=[p], alignment="CENTER")
+
+
+def _left(doc, p):
+    doc.styles.apply_paragraph_format(paragraphs=[p], alignment="LEFT")
+
+
+def _cell_text_centered(doc, cell, text, *, char_pr_id_ref, align="CENTER"):
+    cell.set_text("")
+    p = cell.add_paragraph(str(text), char_pr_id_ref=char_pr_id_ref)
+    if align == "CENTER":
+        _center(doc, p)
+    elif align == "LEFT":
+        _left(doc, p)
+    return p
+
+
+def _title_band(doc, text):
+    sid = _style(doc, font=FONT_HEAD, bold=True, color=WHITE, size=20)
+    table = doc.add_table(1, 1)
+    table.set_cell_shading(0, 0, BLUE)
+    table.set_cell_borders(0, 0, color=GRAY_TEXT)
+    _cell_text_centered(doc, table.cell(0, 0), text, char_pr_id_ref=sid)
+
+
+def _section_heading(doc, number, title):
+    sid = _style(doc, font=FONT_HEAD, bold=True, size=15)
+    doc.add_paragraph(f"{number}. {title}", char_pr_id_ref=sid)
+
+
+def _label_line(doc, label, value):
+    sid = _style(doc, size=12)
+    doc.add_paragraph(f"□  {label} : {value}", char_pr_id_ref=sid)
+
+
+def _text_line(doc, text, *, size=12, bold=False, color=BLACK):
+    sid = _style(doc, size=size, bold=bold, color=color)
+    doc.add_paragraph(text, char_pr_id_ref=sid)
+
+
+def _page_break(doc):
+    p = doc.add_paragraph("")
+    doc.styles.apply_paragraph_format(paragraphs=[p], page_break_before=True)
+
+
+def _attachment_header(doc, number, title):
+    sid1 = _style(doc, font=FONT_HEAD, bold=True, size=13)
+    sid2 = _style(doc, font=FONT_HEAD, bold=True, size=14)
+    table = doc.add_table(1, 2)
+    table.set_column_widths([15, 85])
+    table.set_cell_shading(0, 0, GREEN)
+    _cell_text_centered(doc, table.cell(0, 0), f"붙임 {number}", char_pr_id_ref=sid1, align="CENTER")
+    _cell_text_centered(doc, table.cell(0, 1), title, char_pr_id_ref=sid2, align="LEFT")
+
+
+def _equipment_table(doc, equipment):
+    if not equipment:
+        return
+    rows = 1 + len(equipment)
+    table = doc.add_table(rows, 5)
+    table.set_column_widths([24, 21, 14, 12, 19])
+    hsid = _style(doc, size=10)
+    headers = ["설비명", "규 격", "제작년월", "제작사", "최근 점검년월"]
+    for j, h in enumerate(headers):
+        table.set_cell_shading(0, j, LIGHT_BLUE)
+        _cell_text_centered(doc, table.cell(0, j), h, char_pr_id_ref=hsid)
+    bsid = _style(doc, size=9.5)
+    for i, item in enumerate(equipment, 1):
+        for j, key in enumerate(("name", "spec", "made", "maker", "inspection")):
+            _cell_text_centered(doc, table.cell(i, j), item.get(key, ""), char_pr_id_ref=bsid)
+
+
+def _flow_table(doc, flow):
+    flow = (list(flow) + [""] * 4)[:4]
+    table = doc.add_table(1, 7)
+    table.set_column_widths([19, 5, 19, 5, 19, 5, 21])
+    box_sid = _style(doc, font=FONT_HEAD, bold=True, size=10.5)
+    arrow_sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)
+    values = [flow[0], "▶", flow[1], "▶", flow[2], "▶", flow[3]]
+    for j, v in enumerate(values):
+        c = table.cell(0, j)
+        c.set_text("")
+        if j % 2 == 0:
+            table.set_cell_shading(0, j, "F8F8F8")
+            table.set_cell_borders(0, j, color=GRAY_TEXT)
+            lines = str(v).split("\n") if v else [""]
+            for k, line in enumerate(lines):
+                p = c.add_paragraph(line, char_pr_id_ref=box_sid)
+                _center(doc, p)
+        else:
+            p = c.add_paragraph(v, char_pr_id_ref=arrow_sid)
+            _center(doc, p)
+
+
+def _diagram_box(doc, placeholder, caption):
+    table = doc.add_table(1, 1)
+    table.set_cell_shading(0, 0, "FAFAFA")
+    c = table.cell(0, 0)
+    c.set_text("")
+    sid = _style(doc, font=FONT_HEAD, bold=True, size=14, color=GRAY_TEXT)
+    for line in placeholder.split("\n"):
+        p = c.add_paragraph(line, char_pr_id_ref=sid)
+        _center(doc, p)
+    if caption:
+        csid = _style(doc, bold=True, size=12)
+        p = doc.add_paragraph(caption, char_pr_id_ref=csid)
+        _center(doc, p)
+
+
+def _events_table(doc, events):
+    rows = 1 + max(len(events), 1)
+    table = doc.add_table(rows, 4)
+    table.set_column_widths([23, 40, 12, 25])
+    hsid = _style(doc, bold=True, size=11)
+    for j, h in enumerate(["발생시간", "포인트명", "상태", "비고"]):
+        table.set_cell_shading(0, j, LIGHT_GRAY)
+        _cell_text_centered(doc, table.cell(0, j), h, char_pr_id_ref=hsid)
+    bsid = _style(doc, size=10.5)
+    if events:
+        for i, ev in enumerate(events, 1):
+            vals = [ev.get("time", ""), ev.get("point", ""), ev.get("status", ""), ev.get("note", "")]
+            for j, v in enumerate(vals):
+                align = "LEFT" if j == 1 else "CENTER"
+                _cell_text_centered(doc, table.cell(i, j), v, char_pr_id_ref=bsid, align=align)
+    else:
+        _cell_text_centered(doc, table.cell(1, 0), "", char_pr_id_ref=bsid)
+
+
+def _photos_section(doc, photos):
+    photos = list(photos)
+    while len(photos) < 4:
+        photos.append({"title": f"현장사진 {len(photos) + 1}", "data": None, "format": None})
+    cap_table = doc.add_table(2, 2)
+    cap_table.set_column_widths([50, 50])
+    csid = _style(doc, font=FONT_HEAD, bold=True, size=11.5)
+    for idx, item in enumerate(photos[:4]):
+        r, c_idx = divmod(idx, 2)
+        cap_table.set_cell_shading(r, c_idx, LIGHT_BLUE)
+        _cell_text_centered(doc, cap_table.cell(r, c_idx), item.get("title", ""), char_pr_id_ref=csid)
+
+    for item in photos[:4]:
+        data = item.get("data")
+        fmt = item.get("format")
+        if data and fmt:
+            doc.add_picture(bytes(data), fmt, width_mm=70, height_mm=44, align="CENTER")
+        else:
+            sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)
+            p = doc.add_paragraph(f"[{item.get('title','현장사진')} 미첨부]", char_pr_id_ref=sid)
+            _center(doc, p)
+
+
+def build_report(data: dict) -> HwpxDocument:
+    doc = HwpxDocument.new()
+    doc.set_page_setup(
+        paper_size="A4", width_mm=210, height_mm=297,
+        margin_left_mm=15, margin_right_mm=15, margin_top_mm=15, margin_bottom_mm=14,
+        header_margin_mm=6, footer_margin_mm=8,
+    )
+
+    incident = data.get("incident", {})
+    title = "[{}] {} {} 정지 보고".format(
+        incident.get("region", ""), incident.get("voltage", ""), incident.get("equipment_title", "")
+    )
+    _title_band(doc, title)
+    _section_heading(doc, 1, incident.get("overview_title", "발생 개요"))
+    _label_line(doc, "발생일시", "{}  (날씨 : {})".format(incident.get("occurred_at", ""), incident.get("weather", "")))
+    _label_line(doc, incident.get("equipment_label", "정지설비"), incident.get("stopped_equipment", ""))
+    for item in incident.get("overview_fields", []) or []:
+        _label_line(doc, item.get("label", ""), item.get("value", ""))
+    _equipment_table(doc, incident.get("equipment", []) or [])
+    _label_line(doc, "계전기 동작", incident.get("relay_operation", ""))
+    _label_line(doc, incident.get("cause_label", "정지원인"), incident.get("cause", ""))
+    _flow_table(doc, incident.get("flow", ["1차고장", "보호장치 부동작", "상위설비 정지", "복구"]))
+
+    _section_heading(doc, 2, incident.get("outage_title", "정전 현황"))
+    _text_line(doc, "□  " + incident.get("outage", ""), size=12.5)
+
+    _section_heading(doc, 3, "언론 및 민원 현황")
+    _text_line(doc, "□  " + incident.get("media", "없음"), size=12.5)
+
+    _section_heading(doc, 4, incident.get("actions_title", "동작 및 조치사항"))
+    for action in incident.get("actions", []) or []:
+        _text_line(doc, "□  " + action, size=11.5)
+
+    _section_heading(doc, 5, "향후 계획")
+    _text_line(doc, "□  " + incident.get("plan", ""), size=11.5)
+
+    _page_break(doc)
+    _attachment_header(doc, 1, incident.get("diagram_title", "간이 단선도 및 고장 범위"))
+    _text_line(doc, "고장 파급 흐름", size=13, bold=True)
+    _flow_table(doc, incident.get("flow", ["1차고장", "보호장치 부동작", "상위설비 정지", "복구"]))
+    _diagram_box(
+        doc,
+        incident.get("diagram_placeholder", "간이 단선도 삽입 영역"),
+        incident.get("diagram_caption", ""),
+    )
+
+    _page_break(doc)
+    _attachment_header(doc, 2, "이벤트 발생 내역")
+    _events_table(doc, data.get("events", []) or [])
+
+    _page_break(doc)
+    _attachment_header(doc, 3, "현장 사진")
+    _photos_section(doc, data.get("photos", []) or [])
+
+    return doc`;
+
+  var pyodideInstance = null;
+  var pyodideReady = false;
+
+  function logStatus(msg, cls){
+    var box = $("genStatus");
+    var line = document.createElement("div");
+    if(cls) line.className = cls;
+    line.textContent = msg;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+  function clearStatus(){ $("genStatus").innerHTML = ""; }
+
+  async function ensurePyodide(){
+    if(pyodideReady) return pyodideInstance;
+    logStatus("파이썬 엔진(Pyodide) 로딩 중... (최초 1회, 20~40초 소요될 수 있음)");
+    if(!window.loadPyodide){
+      await new Promise(function(resolve, reject){
+        var s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js";
+        s.onload = resolve;
+        s.onerror = function(){ reject(new Error("Pyodide 스크립트 로드 실패 - 인터넷 연결을 확인하세요")); };
+        document.head.appendChild(s);
+      });
+    }
+    pyodideInstance = await window.loadPyodide();
+    logStatus("파이썬 엔진 로드 완료.", "ok");
+    logStatus("lxml 설치 중...");
+    await pyodideInstance.loadPackage("micropip");
+    var micropip = pyodideInstance.pyimport("micropip");
+    await micropip.install("lxml");
+    logStatus("lxml 설치 완료.", "ok");
+    logStatus("python-hwpx 설치 중...");
+    await micropip.install("python-hwpx");
+    logStatus("python-hwpx 설치 완료.", "ok");
+    pyodideReady = true;
+    return pyodideInstance;
+  }
+
+  async function generateHwpx(){
+    var btn = $("genBtn");
+    btn.disabled = true;
+    clearStatus();
+    $("genDownload").hidden = true;
+    try{
+      var py = await ensurePyodide();
+      logStatus("입력값 정리 중...");
+      var incident = buildIncident();
+      var events = collectEventRows();
+      var photoRows = collectPhotoRows();
+
+      var dataForJson = {
+        incident: incident,
+        events: events,
+        photos: photoRows.map(function(p, i){ return { title: p.title, format: p.format, _idx: i }; })
+      };
+      py.globals.set("incident_json", JSON.stringify(dataForJson));
+      photoRows.forEach(function(p, i){
+        if(p.data) py.globals.set("photo_bytes_" + i, p.data);
+      });
+
+      logStatus("HWPX 문서 조립 중 (파이썬 실행)...");
+      var driverLines = [
+        "import json",
+        "_data = json.loads(incident_json)",
+        "for _p in _data.get('photos', []):",
+        "    _idx = _p.pop('_idx')",
+        "    _b = globals().get('photo_bytes_' + str(_idx))",
+        "    _p['data'] = bytes(_b.to_py()) if (_b is not None and hasattr(_b, 'to_py')) else None",
+        "_doc = build_report(_data)",
+        "_doc.save_to_path('/tmp/_out.hwpx')",
+        "with open('/tmp/_out.hwpx', 'rb') as _f:",
+        "    _out_bytes = _f.read()",
+        "len(_out_bytes)"
+      ].join("\n");
+
+      var size = await py.runPythonAsync(PY_BUILDER_SRC + "\n\n" + driverLines);
+      logStatus("문서 생성 완료: " + size + " bytes", "ok");
+
+      var outBytesProxy = py.runPython("_out_bytes");
+      var outBytes = outBytesProxy.toJs();
+      outBytesProxy.destroy();
+
+      var blob = new Blob([outBytes], {type: "application/octet-stream"});
+      var url = URL.createObjectURL(blob);
+      var fileName = (($("assetName").value || "고장보고서").replace(/[\\/:*?"<>|]/g, "_")) + "_" +
+        (($("occurredAt").value || "").slice(0,10) || "draft") + ".hwpx";
+      var a = $("genDownloadLink");
+      a.href = url;
+      a.download = fileName;
+      a.textContent = "📄 " + fileName + " 다운로드";
+      $("genSizeNote").textContent = Math.round(outBytes.length/1024) + " KB";
+      $("genDownload").hidden = false;
+      logStatus("완료! 아래 버튼으로 다운로드하세요.", "ok");
+    }catch(err){
+      logStatus("오류: " + (err && err.message ? err.message : String(err)), "err");
+      console.error(err);
+    }finally{
+      btn.disabled = false;
+    }
+  }
+  $("genBtn").addEventListener("click", generateHwpx);
+
+  // PWA로 https 호스팅된 경우에만 등록됨(file://에서는 브라우저가 서비스워커
+  // 등록 자체를 막으므로 조용히 실패해도 앱 동작에는 지장 없음).
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("./sw.js").catch(function(){ /* file:// 등에서는 정상적으로 실패함 */ });
+    });
+  }
+})();</script>
+</body>
+</html>
