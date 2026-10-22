@@ -193,6 +193,7 @@ input::placeholder,textarea::placeholder{color:var(--ink-faint)}
 .photo-thumb-wrap{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .photo-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:0 0 auto;background:var(--surface-sunk)}
 .photo-pick-btn{font-size:13px;padding:11px 14px}
+.diagram-photo-name{font-size:13px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
 .ocr-box{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:var(--sp-3)}
 .ocr-raw{max-height:160px;overflow:auto;background:var(--surface-alt);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;margin:0 0 var(--sp-3)}
@@ -484,6 +485,18 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
         <div class="group">
           <p class="group-title">도면/정지설비 상세 <span class="tag tag-opt">선택</span></p>
           <div class="field">
+            <label class="field-label">간이단선도 사진</label>
+            <p class="row-hint">사진을 넣으면 보고서의 간이단선도 영역에 그대로 삽입됩니다. 비워두면
+            "삽입 영역" 안내 문구가 대신 표시됩니다.</p>
+            <div class="row-item photo" id="diagramPhotoRow">
+              <label class="btn btn-sm photo-pick-btn">사진 선택<input type="file" accept="image/*" hidden id="diagramPhotoPick"></label>
+              <span class="diagram-photo-name" id="diagramPhotoName">선택 안 함</span>
+              <div class="photo-thumb-wrap">
+                <button type="button" class="row-remove" id="diagramPhotoRemove" aria-label="간이단선도 사진 삭제" hidden>×</button>
+              </div>
+            </div>
+          </div>
+          <div class="field">
             <label class="field-label" for="diagramCaption">간이단선도 캡션</label>
             <textarea id="diagramCaption" placeholder="예: 2변압기 정지 / D/L 5개 정지 / 해남D/L 부동작"></textarea>
           </div>
@@ -681,6 +694,44 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
     makeRemovable(wrap);
     $("photoRows").appendChild(wrap);
   }
+
+  // 간이단선도 사진: 실제 바이트를 보관한다(사진 1장만 — 목록이 아니라 단일 슬롯).
+  var diagramPhotoBytes = null;
+  var diagramPhotoFormat = null;
+  function clearDiagramPhoto(){
+    diagramPhotoBytes = null;
+    diagramPhotoFormat = null;
+    $("diagramPhotoName").textContent = "선택 안 함";
+    var thumbWrap = $("diagramPhotoRow").querySelector(".photo-thumb-wrap");
+    var old = thumbWrap.querySelector("img.photo-thumb");
+    if(old) old.remove();
+    $("diagramPhotoRemove").hidden = true;
+  }
+  $("diagramPhotoPick").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      diagramPhotoBytes = new Uint8Array(ev.target.result);
+      var fmt = (file.type.split("/")[1] || "png").toLowerCase();
+      if(fmt === "jpg") fmt = "jpeg";
+      diagramPhotoFormat = fmt;
+      $("diagramPhotoName").textContent = file.name;
+      var thumbWrap = $("diagramPhotoRow").querySelector(".photo-thumb-wrap");
+      var old = thumbWrap.querySelector("img.photo-thumb");
+      if(old) old.remove();
+      var img = document.createElement("img");
+      img.className = "photo-thumb";
+      var blob = new Blob([ev.target.result], {type: file.type});
+      img.src = URL.createObjectURL(blob);
+      thumbWrap.insertBefore(img, thumbWrap.firstChild);
+      $("diagramPhotoRemove").hidden = false;
+      schedulePreview();
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  });
+  $("diagramPhotoRemove").addEventListener("click", function(){ clearDiagramPhoto(); schedulePreview(); });
 
   $("addActionRow").addEventListener("click", function(){ addActionRow(); schedulePreview(); });
   $("addEventRow").addEventListener("click", function(){ addEventRow(); schedulePreview(); });
@@ -893,7 +944,10 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
   function buildSchemaForJson(){
     var inc = buildIncident();
     var photos = collectPhotoRows().map(function(p){ return { title: p.title, has_image: !!p.data }; });
-    return { incident: inc, events: collectEventRows(), photos: photos };
+    return {
+      incident: inc, events: collectEventRows(), photos: photos,
+      diagram_photo: { has_image: !!diagramPhotoBytes }
+    };
   }
 
   function buildTextPreview(){
@@ -1002,7 +1056,9 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
 
     var b4 = "";
     equip.forEach(function(e){ b4 += pvLine(e.name || "설비", [e.spec, e.made, e.maker, e.inspection].filter(Boolean).join(" / ")); });
-    b4 += pvLine("재발방지대책", inc.plan) + pvLine("간이단선도 캡션", inc.diagram_caption) +
+    b4 += pvLine("재발방지대책", inc.plan) +
+      pvLine("간이단선도 사진", diagramPhotoBytes ? "첨부됨" : null) +
+      pvLine("간이단선도 캡션", inc.diagram_caption) +
       pvLine("정지설비 상세", inc.stopped_equipment) +
       pvLine("현장사진", photos.length ? (photos.length + "장 등록 (" + photos.filter(function(p){ return p.data; }).length + "장 첨부완료)") : null);
 
@@ -1051,6 +1107,7 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
   function clearDynamicRows(){
     ["actionRows","eventRows","equipRows","kvRows","photoRows"].forEach(function(id){ $(id).innerHTML = ""; });
     document.querySelectorAll(".flow-input").forEach(function(i){ i.value = ""; });
+    clearDiagramPhoto();
   }
 
   function fillExample(){
@@ -1148,8 +1205,13 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
 """
 generate_fault_report.py(python-docx)의 레이아웃을 python-hwpx로 직접 재현한다.
 v2: 폰트 지정(휴먼명조/HY헤드라인M), 표 셀 가운데정렬, 흐름도 줄바꿈 수정.
+v3: 표 셀 세로정렬을 코드에서 명시적으로 가운데 고정, 현장사진을 2열 그리드로
+    배치해 장수에 관계없이 붙임 3이 한 페이지 안에 들어오도록 수정.
 """
 from hwpx.document import HwpxDocument
+from hwpx._document.media import add_image as _register_image
+
+_HWP_UNITS_PER_MM = 7200 / 25.4
 
 FONT_BODY = "휴먼명조"
 FONT_HEAD = "HY헤드라인M"
@@ -1176,6 +1238,22 @@ def _left(doc, p):
     doc.styles.apply_paragraph_format(paragraphs=[p], alignment="LEFT")
 
 
+def _mm_to_hwpunits(value):
+    return round(value * _HWP_UNITS_PER_MM)
+
+
+def _ensure_cell_vertical_center(cell):
+    """셀의 세로정렬을 코드에서 명시적으로 가운데(CENTER)로 고정한다.
+
+    python-hwpx가 만드는 subList도 기본값이 CENTER이지만, 한컴오피스 호환성
+    요구사항(표 안 모든 글씨는 세로 가운데 정렬)을 라이브러리 기본값에 기대지
+    않고 이 코드가 직접 보장하도록 명시적으로 설정한다.
+    """
+    sublist = cell.element.find("{*}subList")
+    if sublist is not None:
+        sublist.set("vertAlign", "CENTER")
+
+
 def _cell_text_centered(doc, cell, text, *, char_pr_id_ref, align="CENTER"):
     cell.set_text("")
     p = cell.add_paragraph(str(text), char_pr_id_ref=char_pr_id_ref)
@@ -1183,6 +1261,7 @@ def _cell_text_centered(doc, cell, text, *, char_pr_id_ref, align="CENTER"):
         _center(doc, p)
     elif align == "LEFT":
         _left(doc, p)
+    _ensure_cell_vertical_center(cell)
     return p
 
 
@@ -1294,17 +1373,32 @@ def _flow_table(doc, flow):
         else:
             p = c.add_paragraph(v, char_pr_id_ref=arrow_sid)
             _center(doc, p)
+        _ensure_cell_vertical_center(c)
 
 
-def _diagram_box(doc, placeholder, caption):
-    table = doc.add_table(1, 1)
-    table.set_cell_shading(0, 0, "FAFAFA")
-    c = table.cell(0, 0)
-    c.set_text("")
-    sid = _style(doc, font=FONT_HEAD, bold=True, size=14, color=GRAY_TEXT)
-    for line in placeholder.split("\n"):
-        p = c.add_paragraph(line, char_pr_id_ref=sid)
-        _center(doc, p)
+# 간이단선도 사진의 최대 박스(mm). 위에 "고장 파급 흐름" 표가 이미 자리를
+# 차지하므로 전체 페이지보다 조금 작게 잡는다.
+_DIAGRAM_MAX_W_MM = 170.0
+_DIAGRAM_MAX_H_MM = 180.0
+
+
+def _diagram_box(doc, placeholder, caption, photo=None):
+    data = (photo or {}).get("data")
+    fmt = (photo or {}).get("format")
+    if data and fmt:
+        data = bytes(data)
+        width_mm, height_mm = _fit_photo_size_mm(data, fmt, _DIAGRAM_MAX_W_MM, _DIAGRAM_MAX_H_MM)
+        doc.add_picture(data, fmt, width_mm=width_mm, height_mm=height_mm, align="CENTER")
+    else:
+        table = doc.add_table(1, 1)
+        table.set_cell_shading(0, 0, "FAFAFA")
+        c = table.cell(0, 0)
+        c.set_text("")
+        sid = _style(doc, font=FONT_HEAD, bold=True, size=14, color=GRAY_TEXT)
+        for line in placeholder.split("\n"):
+            p = c.add_paragraph(line, char_pr_id_ref=sid)
+            _center(doc, p)
+        _ensure_cell_vertical_center(c)
     if caption:
         csid = _style(doc, bold=True, size=12)
         p = doc.add_paragraph(caption, char_pr_id_ref=csid)
@@ -1364,42 +1458,87 @@ def _image_dimensions(data, fmt):
     return None
 
 
-# 사진 1장을 끼워넣을 수 있는 최대 박스(mm). 원본 비율은 그대로 유지한 채
+# 사진 한 장을 끼워넣을 수 있는 박스(mm). 원본 비율은 그대로 유지한 채
 # 이 박스 안에 들어오도록 리사이징만 한다(크롭·강제비율 왜곡 없음).
-_PHOTO_MAX_W_MM = 150.0
-_PHOTO_MAX_H_MM = 170.0
-
-
-def _fit_photo_size_mm(data, fmt):
+def _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm):
     dims = _image_dimensions(data, fmt)
     if not dims:
-        return _PHOTO_MAX_W_MM, _PHOTO_MAX_W_MM * 0.75
+        return max_w_mm, max_w_mm * 0.75
     w, h = dims
-    width_mm, height_mm = _PHOTO_MAX_W_MM, _PHOTO_MAX_W_MM * h / w
-    if height_mm > _PHOTO_MAX_H_MM:
-        height_mm = _PHOTO_MAX_H_MM
-        width_mm = _PHOTO_MAX_H_MM * w / h
+    width_mm, height_mm = max_w_mm, max_w_mm * h / w
+    if height_mm > max_h_mm:
+        height_mm = max_h_mm
+        width_mm = max_h_mm * w / h
     return width_mm, height_mm
+
+
+# 붙임3(현장사진)이 몇 장이든 한 페이지 안에 들어오도록 2열 그리드로 배치하고,
+# 행 수에 맞춰 칸 높이를 동적으로 줄인다. 사진이 1장뿐이면 1열로 크게 보여준다.
+_PHOTO_CONTENT_W_MM = 180.0  # A4에서 좌우 여백(15+15mm)을 뺀 본문 폭
+_PHOTO_PAGE_BUDGET_MM = 235.0  # 붙임3 제목줄 아래, 한 페이지에서 사진 영역이 쓸 수 있는 높이
+_PHOTO_CAPTION_H_MM = 9.0
+_PHOTO_MIN_CELL_H_MM = 40.0
+_PHOTO_MAX_CELL_H_MM = 150.0
+_PHOTO_SINGLE_MAX_W_MM = 170.0
+_PHOTO_SINGLE_MAX_H_MM = 225.0
+
+
+def _place_photo_in_cell(doc, cell, item, max_w_mm, max_h_mm):
+    cell.set_text("")
+    data = item.get("data")
+    fmt = item.get("format")
+    if data and fmt:
+        data = bytes(data)
+        width_mm, height_mm = _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm)
+        binary_item_id_ref = str(_register_image(doc, data, fmt))
+        p = cell.add_paragraph("")
+        _center(doc, p)
+        p.add_picture(
+            binary_item_id_ref,
+            width=_mm_to_hwpunits(width_mm),
+            height=_mm_to_hwpunits(height_mm),
+            align="CENTER",
+        )
+    else:
+        sid = _style(doc, font=FONT_HEAD, bold=True, size=11, color=ARROW_GRAY)
+        p = cell.add_paragraph(f"[{item.get('title','현장사진')} 미첨부]", char_pr_id_ref=sid)
+        _center(doc, p)
+    _ensure_cell_vertical_center(cell)
 
 
 def _photos_section(doc, photos):
     photos = list(photos) or [{"title": "현장사진 1", "data": None, "format": None}]
-    csid = _style(doc, font=FONT_HEAD, bold=True, size=11.5)
-    for item in photos:
-        cap_table = doc.add_table(1, 1)
-        cap_table.set_cell_shading(0, 0, LIGHT_BLUE)
-        _cell_text_centered(doc, cap_table.cell(0, 0), item.get("title", ""), char_pr_id_ref=csid)
+    n = len(photos)
+    cols = 1 if n == 1 else 2
+    rows = -(-n // cols)  # 올림 나눗셈
 
-        data = item.get("data")
-        fmt = item.get("format")
-        if data and fmt:
-            data = bytes(data)
-            width_mm, height_mm = _fit_photo_size_mm(data, fmt)
-            doc.add_picture(data, fmt, width_mm=width_mm, height_mm=height_mm, align="CENTER")
-        else:
-            sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)
-            p = doc.add_paragraph(f"[{item.get('title','현장사진')} 미첨부]", char_pr_id_ref=sid)
-            _center(doc, p)
+    if cols == 1:
+        cell_w_mm, cell_h_mm = _PHOTO_SINGLE_MAX_W_MM, _PHOTO_SINGLE_MAX_H_MM
+    else:
+        cell_w_mm = _PHOTO_CONTENT_W_MM / cols - 6.0
+        cell_h_mm = max(
+            _PHOTO_MIN_CELL_H_MM,
+            min(_PHOTO_MAX_CELL_H_MM, _PHOTO_PAGE_BUDGET_MM / rows - _PHOTO_CAPTION_H_MM),
+        )
+
+    table = doc.add_table(rows * 2, cols)
+    table.set_column_widths([1] * cols)
+    csid = _style(doc, font=FONT_HEAD, bold=True, size=11.5)
+
+    for idx, item in enumerate(photos):
+        r, c = divmod(idx, cols)
+        cap_row, photo_row = r * 2, r * 2 + 1
+        table.set_cell_shading(cap_row, c, LIGHT_BLUE)
+        _cell_text_centered(doc, table.cell(cap_row, c), item.get("title", ""), char_pr_id_ref=csid)
+        _place_photo_in_cell(doc, table.cell(photo_row, c), item, cell_w_mm, cell_h_mm)
+
+    # 사진 수가 열 수로 나누어떨어지지 않으면 마지막 행에 빈 칸이 남는다 — 빈 칸으로 둔다.
+    remainder = n % cols
+    if remainder:
+        last_cap_row, last_photo_row = (rows - 1) * 2, (rows - 1) * 2 + 1
+        for c in range(remainder, cols):
+            table.cell(last_cap_row, c).set_text("")
+            table.cell(last_photo_row, c).set_text("")
 
 
 def build_report(data: dict) -> HwpxDocument:
@@ -1446,6 +1585,7 @@ def build_report(data: dict) -> HwpxDocument:
         doc,
         incident.get("diagram_placeholder", "간이 단선도 삽입 영역"),
         incident.get("diagram_caption", ""),
+        data.get("diagram_photo"),
     )
 
     _page_break(doc)
@@ -1512,12 +1652,14 @@ def build_report(data: dict) -> HwpxDocument:
       var dataForJson = {
         incident: incident,
         events: events,
-        photos: photoRows.map(function(p, i){ return { title: p.title, format: p.format, _idx: i }; })
+        photos: photoRows.map(function(p, i){ return { title: p.title, format: p.format, _idx: i }; }),
+        diagram_photo: diagramPhotoBytes ? { format: diagramPhotoFormat } : null
       };
       py.globals.set("incident_json", JSON.stringify(dataForJson));
       photoRows.forEach(function(p, i){
         if(p.data) py.globals.set("photo_bytes_" + i, p.data);
       });
+      if(diagramPhotoBytes) py.globals.set("diagram_photo_bytes", diagramPhotoBytes);
 
       logStatus("HWPX 문서 조립 중 (파이썬 실행)...");
       var driverLines = [
@@ -1527,6 +1669,10 @@ def build_report(data: dict) -> HwpxDocument:
         "    _idx = _p.pop('_idx')",
         "    _b = globals().get('photo_bytes_' + str(_idx))",
         "    _p['data'] = bytes(_b.to_py()) if (_b is not None and hasattr(_b, 'to_py')) else None",
+        "_dp = _data.get('diagram_photo')",
+        "if _dp is not None:",
+        "    _db = globals().get('diagram_photo_bytes')",
+        "    _dp['data'] = bytes(_db.to_py()) if (_db is not None and hasattr(_db, 'to_py')) else None",
         "_doc = build_report(_data)",
         "_doc.save_to_path('/tmp/_out.hwpx')",
         "with open('/tmp/_out.hwpx', 'rb') as _f:",
