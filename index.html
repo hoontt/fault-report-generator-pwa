@@ -245,7 +245,16 @@ input::placeholder,textarea::placeholder{color:var(--ink-faint)}
 .spinner{width:14px;height:14px;border-radius:999px;border:2px solid var(--line);border-top-color:var(--orange);display:inline-block;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-#genBtn{width:100%}
+#genBtn,#pdfBtn{width:100%}
+
+.gen-sub{display:flex;flex-direction:column;gap:var(--sp-3)}
+.gen-sub-label{margin:0;font-size:12.5px;font-weight:700;color:var(--ink-faint)}
+.gen-divider{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-faint);margin:2px 0}
+.gen-divider::before,.gen-divider::after{content:"";flex:1 1 auto;height:1px;background:var(--line)}
+
+/* 생성된 hwpx를 PDF로 바꿀 때만 쓰는, 화면 밖 렌더링 영역(사용자에게는 안 보임) */
+.pdf-print-root{position:absolute;left:-10000px;top:0}
+.pdf-page{display:block}
 
 footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(--sp-6) var(--sp-4) 0}
 
@@ -528,7 +537,7 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
         </div>
 
         <p class="gen-intro">이 보고서는 이 기기 안에만 저장됩니다. HWPX 생성 시 최초 1회만 파이썬 엔진(약 20~30MB)을
-        내려받고, 이후에는 캐시되어 더 빨라집니다.</p>
+        내려받고, 이후에는 캐시되어 더 빨라집니다. 휴대폰에 HWPX 리더가 없다면 PDF로도 바로 확인·저장할 수 있습니다.</p>
 
         <div class="missing" id="missingBox">
           <strong>아직 비어있는 필수 항목</strong>
@@ -547,11 +556,24 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
           </div>
           <div class="preview-body">
             <div class="view gen-box" id="viewGen">
-              <button type="button" class="btn btn-accent" id="genBtn">HWPX 생성</button>
-              <div class="gen-status" id="genStatus">대기 중 — 위 버튼을 누르면 시작합니다. 최초 1회는 파이썬 엔진을 내려받느라 20~40초 정도 걸릴 수 있습니다.</div>
-              <div class="gen-download" id="genDownload" hidden>
-                <a id="genDownloadLink" class="btn btn-accent" download>📄 HWPX 파일 다운로드</a>
-                <span class="gen-note" id="genSizeNote"></span>
+              <div class="gen-sub">
+                <p class="gen-sub-label">정식 문서 (PC·한컴오피스에서 열람/결재)</p>
+                <button type="button" class="btn btn-accent" id="genBtn">HWPX 생성</button>
+                <div class="gen-status" id="genStatus">대기 중 — 위 버튼을 누르면 시작합니다. 최초 1회는 파이썬 엔진을 내려받느라 20~40초 정도 걸릴 수 있습니다.</div>
+                <div class="gen-download" id="genDownload" hidden>
+                  <a id="genDownloadLink" class="btn btn-accent" download>📄 HWPX 파일 다운로드</a>
+                  <span class="gen-note" id="genSizeNote"></span>
+                </div>
+              </div>
+              <div class="gen-divider">또는</div>
+              <div class="gen-sub">
+                <p class="gen-sub-label">휴대폰에서 바로 보기 (HWPX 리더 불필요)</p>
+                <button type="button" class="btn btn-accent" id="pdfBtn">PDF로 보기·저장</button>
+                <div class="gen-status" id="pdfStatus">대기 중 — 위 버튼을 누르면 이 보고서를 PDF로 만듭니다. 휴대폰 기본 뷰어로 바로 열립니다.</div>
+                <div class="gen-download" id="pdfDownload" hidden>
+                  <a id="pdfDownloadLink" class="btn btn-accent" download>📄 PDF 파일 다운로드</a>
+                  <span class="gen-note" id="pdfSizeNote"></span>
+                </div>
               </div>
             </div>
             <div class="view" id="viewText" hidden><div class="preview-blocks" id="previewText"></div></div>
@@ -571,6 +593,13 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
     <button type="button" class="btn btn-nav" id="stepPrevBtn">← 이전</button>
     <button type="button" class="btn btn-nav btn-accent" id="stepNextBtn">다음 →</button>
   </nav>
+
+  <div class="pdf-print-root" id="pdfPrintRoot" aria-hidden="true">
+    <div class="pdf-page" id="pdfPage1"></div>
+    <div class="pdf-page" id="pdfPage2"></div>
+    <div class="pdf-page" id="pdfPage3"></div>
+    <div class="pdf-page" id="pdfPage4"></div>
+  </div>
 </div>
 
 <script>(function(){
@@ -1201,20 +1230,20 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
   schedulePreview();
 
   // ====================== HWPX 생성 (Pyodide) ======================
-  var PY_BUILDER_SRC = "# -*- coding: utf-8 -*-\n\"\"\"\ngenerate_fault_report.py(python-docx)의 레이아웃을 python-hwpx로 직접 재현한다.\nv2: 폰트 지정(휴먼명조/HY헤드라인M), 표 셀 가운데정렬, 흐름도 줄바꿈 수정.\nv3: 표 셀 세로정렬을 코드에서 명시적으로 가운데 고정, 현장사진을 2열 그리드로\n    배치해 장수에 관계없이 붙임 3이 한 페이지 안에 들어오도록 수정.\nv4: 제목표·붙임 헤더 위의 빈 줄 제거, 문서 전체 줄간격 200%, 제목표·붙임\n    헤더는 높이 20mm 고정+HY헤드라인M 20pt, 그 외 표 글씨는 14pt로 통일,\n    문단(섹션/표) 경계마다 빈 줄 삽입.\nv5: 표 셀 줄간격 100%로 되돌림(본문은 200% 유지), 셀 글씨가 한 줄에 안\n    들어가면 자간을 최대 -15%까지 줄여 한 줄로 맞추고(그래도 안 되면 자간\n    0%로 되돌려 자연스럽게 두 줄), 제목표·붙임 헤더 높이 15mm, 그 외 표\n    글씨 15pt, 표 경계 빈 줄은 빼고 섹션 경계 빈 줄만 유지.\n\"\"\"\nfrom hwpx.document import HwpxDocument\nfrom hwpx._document.media import add_image as _register_image\nfrom hwpx.form_fit.measure import char_advance, TextStyle\nfrom hwpx.oxml.table_sizes import cell_margins as _cell_margins\n\n_HWP_UNITS_PER_MM = 7200 / 25.4\n\nFONT_BODY = \"휴먼명조\"\nFONT_HEAD = \"HY헤드라인M\"\n\nBLUE = \"#356AA0\"\nLIGHT_BLUE = \"#D9E2F3\"\nLIGHT_GRAY = \"#D9D9D9\"\nGREEN = \"#B7DDB5\"\nWHITE = \"#FFFFFF\"\nBLACK = \"#000000\"\nGRAY_TEXT = \"#7F7F7F\"\nARROW_GRAY = \"#A6A6A6\"\n\n\ndef _style(doc, *, font=FONT_BODY, **kw):\n    return doc.ensure_run_style(font=font, **kw)\n\n\ndef _center(doc, p):\n    doc.styles.apply_paragraph_format(paragraphs=[p], alignment=\"CENTER\", line_spacing_percent=100)\n\n\ndef _left(doc, p):\n    doc.styles.apply_paragraph_format(paragraphs=[p], alignment=\"LEFT\", line_spacing_percent=100)\n\n\ndef _blank_line(doc):\n    \"\"\"섹션이 바뀌는 경계에 빈 줄 하나를 넣는다(표 경계에는 안 쓴다).\"\"\"\n    sid = _style(doc, size=11)\n    doc.add_paragraph(\"\", char_pr_id_ref=sid)\n\n\ndef _mm_to_hwpunits(value):\n    return round(value * _HWP_UNITS_PER_MM)\n\n\ndef _ensure_cell_vertical_center(cell):\n    \"\"\"셀의 세로정렬을 코드에서 명시적으로 가운데(CENTER)로 고정한다.\n\n    python-hwpx가 만드는 subList도 기본값이 CENTER이지만, 한컴오피스 호환성\n    요구사항(표 안 모든 글씨는 세로 가운데 정렬)을 라이브러리 기본값에 기대지\n    않고 이 코드가 직접 보장하도록 명시적으로 설정한다.\n    \"\"\"\n    sublist = cell.element.find(\"{*}subList\")\n    if sublist is not None:\n        sublist.set(\"vertAlign\", \"CENTER\")\n\n\ndef _clear_cell(cell):\n    \"\"\"셀 안의 기존 문단을 전부 비운다.\n\n    cell.set_text(\"\")는 빈 셀에 대해 그대로 반환하는 아무 동작도 하지 않는\n    호출이라(새로 만든 셀은 이미 빈 문단 하나를 갖고 있다), 그 뒤에\n    add_paragraph(...)를 쓰면 기존 빈 문단은 그대로 남고 새 문단이 \"추가\"되어\n    글씨 위에 빈 줄이 한 번 생긴다(세로 가운데 정렬이 그 빈 줄까지 포함해\n    계산되면서 글씨가 아래쪽으로 밀려 보이는 원인). 기존 문단을 모두 지우고\n    새로 하나만 넣어야 이 빈 줄이 생기지 않는다.\n    \"\"\"\n    sublist = cell.element.find(\"{*}subList\")\n    if sublist is not None:\n        for p in list(sublist.findall(\"{*}p\")):\n            sublist.remove(p)\n\n\n# 셀 글씨를 한 줄에 맞추려고 줄여보는 자간(자간, %)의 최대 폭. 0%에서\n# 시작해 -1%씩 더 줄여보다가 이 값까지 줄여도 한 줄에 안 들어가면 자간을\n# 0%로 되돌리고 자연스럽게 두 줄로 줄바꿈되게 둔다.\n_SQUEEZE_MAX_PERCENT = 15\n\n\ndef _text_width_hwpunit(text, font_pt, font_name, spacing_percent):\n    style = TextStyle(spacing=spacing_percent, hangul_face=font_name, glyph_face=font_name)\n    return sum(char_advance(ch, font_pt, style) for ch in text)\n\n\ndef _cell_available_width(cell):\n    margins = _cell_margins(cell)\n    return max(cell.width - margins.left - margins.right, 0)\n\n\ndef _choose_letter_spacing(cell, text, *, font, size):\n    \"\"\"text가 셀 한 줄에 들어가도록 자간(%)을 고른다.\"\"\"\n    if not text:\n        return 0\n    width = _cell_available_width(cell)\n    if width <= 0:\n        return 0\n    if _text_width_hwpunit(text, size, font, 0) <= width:\n        return 0\n    for pct in range(1, _SQUEEZE_MAX_PERCENT + 1):\n        if _text_width_hwpunit(text, size, font, -pct) <= width:\n            return -pct\n    return 0\n\n\ndef _cell_text_centered(doc, cell, text, *, font=FONT_BODY, size, bold=False, color=BLACK, align=\"CENTER\"):\n    _clear_cell(cell)\n    text = str(text)\n    spacing = _choose_letter_spacing(cell, text, font=font, size=size)\n    char_pr_id_ref = _style(doc, font=font, size=size, bold=bold, color=color, letter_spacing=spacing)\n    p = cell.add_paragraph(text, char_pr_id_ref=char_pr_id_ref)\n    if align == \"CENTER\":\n        _center(doc, p)\n    elif align == \"LEFT\":\n        _left(doc, p)\n    _ensure_cell_vertical_center(cell)\n    return p\n\n\ndef _title_band(doc, text):\n    # 새 문서는 빈 문단을 하나 가진 채로 시작한다. doc.add_table(...)은 항상\n    # 새 문단을 \"추가\"해 표를 넣으므로, 그대로 쓰면 제목표 위에 그 빈 문단이\n    # 줄바꿈 한 번으로 남는다. 이 함수는 build_report()에서 가장 먼저\n    # 호출된다고 보고, 그 기존 빈 문단 자체에 표를 넣어 빈 줄을 없앤다.\n    host = doc.paragraphs[0]\n    table = host.add_table(1, 1, height=_mm_to_hwpunits(15))\n    table.set_cell_shading(0, 0, BLUE)\n    table.set_cell_borders(0, 0, color=GRAY_TEXT)\n    _cell_text_centered(doc, table.cell(0, 0), text, font=FONT_HEAD, bold=True, color=WHITE, size=20)\n\n\ndef _section_heading(doc, number, title):\n    sid = _style(doc, font=FONT_HEAD, bold=True, size=15)\n    doc.add_paragraph(f\"{number}. {title}\", char_pr_id_ref=sid)\n\n\ndef _split_trailing_remark(text):\n    \"\"\"끝에 붙은 최상위 괄호 설명(예: '...(날씨 : 맑음)')을 본문과 분리한다.\"\"\"\n    t = text.rstrip()\n    if not t.endswith(\")\"):\n        return text, \"\"\n    depth = 0\n    open_idx = None\n    for i, ch in enumerate(t):\n        if ch == \"(\":\n            if depth == 0:\n                open_idx = i\n            depth += 1\n        elif ch == \")\":\n            depth -= 1\n    if open_idx is None or depth != 0:\n        return text, \"\"\n    return t[:open_idx].rstrip(), t[open_idx:]\n\n\ndef _emphasized_line(doc, text, *, size, prefix=\"\"):\n    \"\"\"prefix(일반) + 본문값(볼드) + 끝 괄호설명(일반) 형태로 한 줄을 구성한다.\"\"\"\n    main, remark = _split_trailing_remark(str(text))\n    sid = _style(doc, size=size)\n    bsid = _style(doc, size=size, bold=True)\n    p = doc.add_paragraph(\"\", char_pr_id_ref=sid, include_run=False)\n    if prefix:\n        p.add_run(prefix, char_pr_id_ref=sid)\n    if main:\n        p.add_run(main, char_pr_id_ref=bsid)\n    if remark:\n        p.add_run((\" \" if main else \"\") + remark, char_pr_id_ref=sid)\n    return p\n\n\ndef _label_line(doc, label, value):\n    _emphasized_line(doc, value, size=15, prefix=f\"□  {label} : \")\n\n\ndef _text_line(doc, text, *, size=12, bold=False, color=BLACK):\n    sid = _style(doc, size=size, bold=bold, color=color)\n    doc.add_paragraph(text, char_pr_id_ref=sid)\n\n\ndef _attachment_header(doc, number, title):\n    table = doc.add_table(1, 2, height=_mm_to_hwpunits(15))\n    # 쪽바꿈을 별도의 빈 문단으로 만들지 않고 표 자신을 담은 문단에 직접\n    # 건다 — 전에는 _page_break()가 빈 문단을 하나 만들고 그 다음 문단에\n    # 표를 넣어서, 매 붙임 제목표 위에 줄바꿈이 하나씩 남았다.\n    # apply_paragraph_format(page_break_before=True)는 paraPr \"스타일\"을\n    # 바꾸는데, 이 스타일이 다른 표(흐름도 등)의 기본 문단과 같은 것으로\n    # 합쳐지면서 관계없는 표 앞에도 쪽바꿈이 번지는 문제가 있었다. hp:p\n    # 자신의 pageBreak 속성(문단 인스턴스 전용, 스타일과 무관)을 직접 켜서\n    # 이 표에만 정확히 쪽바꿈을 건다.\n    table.paragraph.element.set(\"pageBreak\", \"1\")\n    table.set_column_widths([15, 85])\n    table.set_cell_shading(0, 0, GREEN)\n    _cell_text_centered(doc, table.cell(0, 0), f\"붙임 {number}\", font=FONT_HEAD, bold=True, size=20, align=\"CENTER\")\n    _cell_text_centered(doc, table.cell(0, 1), title, font=FONT_HEAD, bold=True, size=20, align=\"LEFT\")\n\n\ndef _equipment_table(doc, equipment):\n    if not equipment:\n        return\n    rows = 1 + len(equipment)\n    table = doc.add_table(rows, 5)\n    table.set_column_widths([24, 21, 14, 12, 19])\n    headers = [\"설비명\", \"규 격\", \"제작년월\", \"제작사\", \"최근 점검년월\"]\n    for j, h in enumerate(headers):\n        table.set_cell_shading(0, j, LIGHT_BLUE)\n        _cell_text_centered(doc, table.cell(0, j), h, font=FONT_HEAD, bold=True, size=14)\n    for i, item in enumerate(equipment, 1):\n        for j, key in enumerate((\"name\", \"spec\", \"made\", \"maker\", \"inspection\")):\n            _cell_text_centered(doc, table.cell(i, j), item.get(key, \"\"), font=FONT_HEAD, bold=True, size=14)\n\n\ndef _flow_table(doc, flow):\n    flow = (list(flow) + [\"\"] * 4)[:4]\n    table = doc.add_table(1, 7)\n    table.set_column_widths([19, 5, 19, 5, 19, 5, 21])\n    box_sid = _style(doc, font=FONT_HEAD, bold=True, size=14)\n    arrow_sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)\n    values = [flow[0], \"▶\", flow[1], \"▶\", flow[2], \"▶\", flow[3]]\n    for j, v in enumerate(values):\n        c = table.cell(0, j)\n        _clear_cell(c)\n        if j % 2 == 0:\n            table.set_cell_shading(0, j, \"F8F8F8\")\n            table.set_cell_borders(0, j, color=GRAY_TEXT)\n            lines = str(v).split(\"\\n\") if v else [\"\"]\n            for k, line in enumerate(lines):\n                p = c.add_paragraph(line, char_pr_id_ref=box_sid)\n                _center(doc, p)\n        else:\n            p = c.add_paragraph(v, char_pr_id_ref=arrow_sid)\n            _center(doc, p)\n        _ensure_cell_vertical_center(c)\n\n\n# 간이단선도 사진의 최대 박스(mm). 위에 \"고장 파급 흐름\" 표가 이미 자리를\n# 차지하므로 전체 페이지보다 조금 작게 잡는다.\n_DIAGRAM_MAX_W_MM = 170.0\n_DIAGRAM_MAX_H_MM = 180.0\n\n\ndef _diagram_box(doc, placeholder, caption, photo=None):\n    data = (photo or {}).get(\"data\")\n    fmt = (photo or {}).get(\"format\")\n    if data and fmt:\n        data = bytes(data)\n        width_mm, height_mm = _fit_photo_size_mm(data, fmt, _DIAGRAM_MAX_W_MM, _DIAGRAM_MAX_H_MM)\n        doc.add_picture(data, fmt, width_mm=width_mm, height_mm=height_mm, align=\"CENTER\")\n    else:\n        table = doc.add_table(1, 1)\n        table.set_cell_shading(0, 0, \"FAFAFA\")\n        c = table.cell(0, 0)\n        _clear_cell(c)\n        sid = _style(doc, font=FONT_HEAD, bold=True, size=14, color=GRAY_TEXT)\n        for line in placeholder.split(\"\\n\"):\n            p = c.add_paragraph(line, char_pr_id_ref=sid)\n            _center(doc, p)\n        _ensure_cell_vertical_center(c)\n    if caption:\n        csid = _style(doc, bold=True, size=15)\n        p = doc.add_paragraph(caption, char_pr_id_ref=csid)\n        _center(doc, p)\n\n\ndef _events_table(doc, events):\n    rows = 1 + max(len(events), 1)\n    table = doc.add_table(rows, 4)\n    table.set_column_widths([23, 40, 12, 25])\n    for j, h in enumerate([\"발생시간\", \"포인트명\", \"상태\", \"비고\"]):\n        table.set_cell_shading(0, j, LIGHT_GRAY)\n        _cell_text_centered(doc, table.cell(0, j), h, font=FONT_HEAD, bold=True, size=14)\n    if events:\n        for i, ev in enumerate(events, 1):\n            vals = [ev.get(\"time\", \"\"), ev.get(\"point\", \"\"), ev.get(\"status\", \"\"), ev.get(\"note\", \"\")]\n            for j, v in enumerate(vals):\n                _cell_text_centered(doc, table.cell(i, j), v, font=FONT_HEAD, bold=True, size=14, align=\"CENTER\")\n    else:\n        _cell_text_centered(doc, table.cell(1, 0), \"\", font=FONT_HEAD, bold=True, size=14)\n\n\ndef _image_dimensions(data, fmt):\n    \"\"\"PNG/JPEG 원본 픽셀 크기를 표준 라이브러리만으로 읽는다(Pyodide 호환).\"\"\"\n    fmt = (fmt or \"\").lower()\n    try:\n        if data[:8] == b\"\\x89PNG\\r\\n\\x1a\\n\" and len(data) >= 24:\n            w = int.from_bytes(data[16:20], \"big\")\n            h = int.from_bytes(data[20:24], \"big\")\n            if w > 0 and h > 0:\n                return w, h\n        elif fmt in (\"jpg\", \"jpeg\") or data[:2] == b\"\\xff\\xd8\":\n            i, n = 2, len(data)\n            while i + 9 < n:\n                if data[i] != 0xFF:\n                    i += 1\n                    continue\n                marker = data[i + 1]\n                if marker == 0xD8 or 0xD0 <= marker <= 0xD7:\n                    i += 2\n                    continue\n                if marker == 0xD9:\n                    break\n                seg_len = int.from_bytes(data[i + 2:i + 4], \"big\")\n                if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,\n                              0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):\n                    h = int.from_bytes(data[i + 5:i + 7], \"big\")\n                    w = int.from_bytes(data[i + 7:i + 9], \"big\")\n                    if w > 0 and h > 0:\n                        return w, h\n                    break\n                i += 2 + seg_len\n    except Exception:\n        pass\n    return None\n\n\n# 사진 한 장을 끼워넣을 수 있는 박스(mm). 원본 비율은 그대로 유지한 채\n# 이 박스 안에 들어오도록 리사이징만 한다(크롭·강제비율 왜곡 없음).\ndef _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm):\n    dims = _image_dimensions(data, fmt)\n    if not dims:\n        return max_w_mm, max_w_mm * 0.75\n    w, h = dims\n    width_mm, height_mm = max_w_mm, max_w_mm * h / w\n    if height_mm > max_h_mm:\n        height_mm = max_h_mm\n        width_mm = max_h_mm * w / h\n    return width_mm, height_mm\n\n\n# 붙임3(현장사진)이 몇 장이든 한 페이지 안에 들어오도록 2열 그리드로 배치하고,\n# 행 수에 맞춰 칸 높이를 동적으로 줄인다. 사진이 1장뿐이면 1열로 크게 보여준다.\n_PHOTO_CONTENT_W_MM = 180.0  # A4에서 좌우 여백(15+15mm)을 뺀 본문 폭\n_PHOTO_PAGE_BUDGET_MM = 235.0  # 붙임3 제목줄 아래, 한 페이지에서 사진 영역이 쓸 수 있는 높이\n_PHOTO_CAPTION_H_MM = 9.0\n_PHOTO_MIN_CELL_H_MM = 40.0\n_PHOTO_MAX_CELL_H_MM = 150.0\n_PHOTO_SINGLE_MAX_W_MM = 170.0\n_PHOTO_SINGLE_MAX_H_MM = 225.0\n\n\ndef _place_photo_in_cell(doc, cell, item, max_w_mm, max_h_mm):\n    _clear_cell(cell)\n    data = item.get(\"data\")\n    fmt = item.get(\"format\")\n    if data and fmt:\n        data = bytes(data)\n        width_mm, height_mm = _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm)\n        binary_item_id_ref = str(_register_image(doc, data, fmt))\n        p = cell.add_paragraph(\"\")\n        _center(doc, p)\n        p.add_picture(\n            binary_item_id_ref,\n            width=_mm_to_hwpunits(width_mm),\n            height=_mm_to_hwpunits(height_mm),\n            align=\"CENTER\",\n        )\n    else:\n        sid = _style(doc, font=FONT_HEAD, bold=True, size=14, color=ARROW_GRAY)\n        p = cell.add_paragraph(f\"[{item.get('title','현장사진')} 미첨부]\", char_pr_id_ref=sid)\n        _center(doc, p)\n    _ensure_cell_vertical_center(cell)\n\n\ndef _photos_section(doc, photos):\n    photos = list(photos) or [{\"title\": \"현장사진 1\", \"data\": None, \"format\": None}]\n    n = len(photos)\n    cols = 1 if n == 1 else 2\n    rows = -(-n // cols)  # 올림 나눗셈\n\n    if cols == 1:\n        cell_w_mm, cell_h_mm = _PHOTO_SINGLE_MAX_W_MM, _PHOTO_SINGLE_MAX_H_MM\n    else:\n        cell_w_mm = _PHOTO_CONTENT_W_MM / cols - 6.0\n        cell_h_mm = max(\n            _PHOTO_MIN_CELL_H_MM,\n            min(_PHOTO_MAX_CELL_H_MM, _PHOTO_PAGE_BUDGET_MM / rows - _PHOTO_CAPTION_H_MM),\n        )\n\n    table = doc.add_table(rows * 2, cols)\n    table.set_column_widths([1] * cols)\n\n    for idx, item in enumerate(photos):\n        r, c = divmod(idx, cols)\n        cap_row, photo_row = r * 2, r * 2 + 1\n        table.set_cell_shading(cap_row, c, LIGHT_BLUE)\n        _cell_text_centered(doc, table.cell(cap_row, c), item.get(\"title\", \"\"), font=FONT_HEAD, bold=True, size=14)\n        _place_photo_in_cell(doc, table.cell(photo_row, c), item, cell_w_mm, cell_h_mm)\n\n    # 사진 수가 열 수로 나누어떨어지지 않으면 마지막 행에 빈 칸이 남는다 — 빈 칸으로 둔다.\n    remainder = n % cols\n    if remainder:\n        last_cap_row, last_photo_row = (rows - 1) * 2, (rows - 1) * 2 + 1\n        for c in range(remainder, cols):\n            table.cell(last_cap_row, c).set_text(\"\")\n            table.cell(last_photo_row, c).set_text(\"\")\n\n\ndef build_report(data: dict) -> HwpxDocument:\n    doc = HwpxDocument.new()\n    doc.set_page_setup(\n        paper_size=\"A4\", width_mm=210, height_mm=297,\n        margin_left_mm=15, margin_right_mm=15, margin_top_mm=15, margin_bottom_mm=14,\n        header_margin_mm=6, footer_margin_mm=8,\n    )\n\n    incident = data.get(\"incident\", {})\n    title = \"[{}] {} {} 정지 보고\".format(\n        incident.get(\"region\", \"\"), incident.get(\"voltage\", \"\"), incident.get(\"equipment_title\", \"\")\n    )\n    _title_band(doc, title)\n    _blank_line(doc)\n    _section_heading(doc, 1, incident.get(\"overview_title\", \"발생 개요\"))\n    _label_line(doc, \"발생일시\", \"{}  (날씨 : {})\".format(incident.get(\"occurred_at\", \"\"), incident.get(\"weather\", \"\")))\n    _label_line(doc, incident.get(\"equipment_label\", \"정지설비\"), incident.get(\"stopped_equipment\", \"\"))\n    for item in incident.get(\"overview_fields\", []) or []:\n        _label_line(doc, item.get(\"label\", \"\"), item.get(\"value\", \"\"))\n    _equipment_table(doc, incident.get(\"equipment\", []) or [])\n    _label_line(doc, \"계전기 동작\", incident.get(\"relay_operation\", \"\"))\n    _label_line(doc, incident.get(\"cause_label\", \"정지원인\"), incident.get(\"cause\", \"\"))\n    _flow_table(doc, incident.get(\"flow\", [\"1차고장\", \"보호장치 부동작\", \"상위설비 정지\", \"복구\"]))\n\n    _blank_line(doc)\n    _section_heading(doc, 2, incident.get(\"outage_title\", \"정전 현황\"))\n    _text_line(doc, \"□  \" + incident.get(\"outage\", \"\"), size=15)\n\n    _blank_line(doc)\n    _section_heading(doc, 3, \"언론 및 민원 현황\")\n    _text_line(doc, \"□  \" + incident.get(\"media\", \"없음\"), size=15)\n\n    _blank_line(doc)\n    _section_heading(doc, 4, incident.get(\"actions_title\", \"동작 및 조치사항\"))\n    for action in incident.get(\"actions\", []) or []:\n        _emphasized_line(doc, action, size=15, prefix=\"□  \")\n\n    _blank_line(doc)\n    _section_heading(doc, 5, \"향후 계획\")\n    _text_line(doc, \"□  \" + incident.get(\"plan\", \"\"), size=15)\n\n    _attachment_header(doc, 1, incident.get(\"diagram_title\", \"간이 단선도 및 고장 범위\"))\n    _text_line(doc, \"고장 파급 흐름\", size=15, bold=True)\n    _flow_table(doc, incident.get(\"flow\", [\"1차고장\", \"보호장치 부동작\", \"상위설비 정지\", \"복구\"]))\n    _diagram_box(\n        doc,\n        incident.get(\"diagram_placeholder\", \"간이 단선도 삽입 영역\"),\n        incident.get(\"diagram_caption\", \"\"),\n        data.get(\"diagram_photo\"),\n    )\n\n    _attachment_header(doc, 2, \"이벤트 발생 내역\")\n    _events_table(doc, data.get(\"events\", []) or [])\n\n    _attachment_header(doc, 3, \"현장 사진\")\n    _photos_section(doc, data.get(\"photos\", []) or [])\n\n    # 본문(표 밖) 문단 전체 줄간격 200% — 표 셀 안 글씨는 각 셀을 쓸 때\n    # _center/_left가 이미 100%로 적용했다.\n    doc.styles.apply_paragraph_format(line_spacing_percent=200)\n\n    return doc";
+  var PY_BUILDER_SRC = "# -*- coding: utf-8 -*-\n\"\"\"\ngenerate_fault_report.py(python-docx)의 레이아웃을 python-hwpx로 직접 재현한다.\nv2: 폰트 지정(휴먼명조/HY헤드라인M), 표 셀 가운데정렬, 흐름도 줄바꿈 수정.\nv3: 표 셀 세로정렬을 코드에서 명시적으로 가운데 고정, 현장사진을 2열 그리드로\n    배치해 장수에 관계없이 붙임 3이 한 페이지 안에 들어오도록 수정.\nv4: 제목표·붙임 헤더 위의 빈 줄 제거, 문서 전체 줄간격 200%, 제목표·붙임\n    헤더는 높이 20mm 고정+HY헤드라인M 20pt, 그 외 표 글씨는 14pt로 통일,\n    문단(섹션/표) 경계마다 빈 줄 삽입.\nv5: 표 셀 줄간격 100%로 되돌림(본문은 200% 유지), 셀 글씨가 한 줄에 안\n    들어가면 자간을 최대 -15%까지 줄여 한 줄로 맞추고(그래도 안 되면 자간\n    0%로 되돌려 자연스럽게 두 줄), 제목표·붙임 헤더 높이 15mm, 그 외 표\n    글씨 15pt, 표 경계 빈 줄은 빼고 섹션 경계 빈 줄만 유지.\nv6: 휴대폰에 HWPX 리더가 없는 경우를 위해, 방금 만든 hwpx 파일 그 자체를\n    (별도로 다시 그리지 않고) hwpx.tools.layout_preview로 PDF용 HTML\n    페이지 조각으로 렌더링하는 render_report_pdf_pages() 추가. 사진은\n    미리보기 도구의 \"[그림 N]\" 플레이스홀더 대신 실제 BinData 이미지를\n    data URI로 끼워 넣는다.\n\"\"\"\nfrom hwpx.document import HwpxDocument\nfrom hwpx._document.media import add_image as _register_image\nfrom hwpx.form_fit.measure import char_advance, TextStyle\nfrom hwpx.oxml.table_sizes import cell_margins as _cell_margins\n\n_HWP_UNITS_PER_MM = 7200 / 25.4\n\nFONT_BODY = \"휴먼명조\"\nFONT_HEAD = \"HY헤드라인M\"\nFONT_TABLE = \"맑은 고딕\"\n\nBLUE = \"#356AA0\"\nLIGHT_BLUE = \"#D9E2F3\"\nLIGHT_GRAY = \"#D9D9D9\"\nGREEN = \"#B7DDB5\"\nWHITE = \"#FFFFFF\"\nBLACK = \"#000000\"\nGRAY_TEXT = \"#7F7F7F\"\nARROW_GRAY = \"#A6A6A6\"\n\n\ndef _style(doc, *, font=FONT_BODY, **kw):\n    return doc.ensure_run_style(font=font, **kw)\n\n\ndef _center(doc, p):\n    doc.styles.apply_paragraph_format(paragraphs=[p], alignment=\"CENTER\", line_spacing_percent=100)\n\n\ndef _left(doc, p):\n    doc.styles.apply_paragraph_format(paragraphs=[p], alignment=\"LEFT\", line_spacing_percent=100)\n\n\ndef _blank_line(doc):\n    \"\"\"섹션이 바뀌는 경계에 빈 줄 하나를 넣는다(표 경계에는 안 쓴다).\"\"\"\n    sid = _style(doc, size=11)\n    doc.add_paragraph(\"\", char_pr_id_ref=sid)\n\n\ndef _mm_to_hwpunits(value):\n    return round(value * _HWP_UNITS_PER_MM)\n\n\ndef _ensure_cell_vertical_center(cell):\n    \"\"\"셀의 세로정렬을 코드에서 명시적으로 가운데(CENTER)로 고정한다.\n\n    python-hwpx가 만드는 subList도 기본값이 CENTER이지만, 한컴오피스 호환성\n    요구사항(표 안 모든 글씨는 세로 가운데 정렬)을 라이브러리 기본값에 기대지\n    않고 이 코드가 직접 보장하도록 명시적으로 설정한다.\n    \"\"\"\n    sublist = cell.element.find(\"{*}subList\")\n    if sublist is not None:\n        sublist.set(\"vertAlign\", \"CENTER\")\n\n\ndef _clear_cell(cell):\n    \"\"\"셀 안의 기존 문단을 전부 비운다.\n\n    cell.set_text(\"\")는 빈 셀에 대해 그대로 반환하는 아무 동작도 하지 않는\n    호출이라(새로 만든 셀은 이미 빈 문단 하나를 갖고 있다), 그 뒤에\n    add_paragraph(...)를 쓰면 기존 빈 문단은 그대로 남고 새 문단이 \"추가\"되어\n    글씨 위에 빈 줄이 한 번 생긴다(세로 가운데 정렬이 그 빈 줄까지 포함해\n    계산되면서 글씨가 아래쪽으로 밀려 보이는 원인). 기존 문단을 모두 지우고\n    새로 하나만 넣어야 이 빈 줄이 생기지 않는다.\n    \"\"\"\n    sublist = cell.element.find(\"{*}subList\")\n    if sublist is not None:\n        for p in list(sublist.findall(\"{*}p\")):\n            sublist.remove(p)\n\n\n# 표 안 여백(상하좌우) — 기본값(좌우 1.8mm·상하 0.5mm 가량)보다 좁게\n# 통일한다.\n_CELL_MARGIN_MM = 0.5\n\n\ndef _set_cell_margins(cell):\n    m = _mm_to_hwpunits(_CELL_MARGIN_MM)\n    cell.set_margins(left=m, right=m, top=m, bottom=m)\n\n\n# 셀 글씨를 한 줄에 맞추려고 줄여보는 자간(자간, %)의 최대 폭. 0%에서\n# 시작해 -1%씩 더 줄여보다가 이 값까지 줄여도 한 줄에 안 들어가면 자간을\n# 0%로 되돌리고 자연스럽게 두 줄로 줄바꿈되게 둔다.\n_SQUEEZE_MAX_PERCENT = 15\n\n\ndef _text_width_hwpunit(text, font_pt, font_name, spacing_percent):\n    style = TextStyle(spacing=spacing_percent, hangul_face=font_name, glyph_face=font_name)\n    return sum(char_advance(ch, font_pt, style) for ch in text)\n\n\ndef _cell_available_width(cell):\n    margins = _cell_margins(cell)\n    return max(cell.width - margins.left - margins.right, 0)\n\n\ndef _choose_letter_spacing(cell, text, *, font, size):\n    \"\"\"text가 셀 한 줄에 들어가도록 자간(%)을 고른다.\"\"\"\n    if not text:\n        return 0\n    width = _cell_available_width(cell)\n    if width <= 0:\n        return 0\n    if _text_width_hwpunit(text, size, font, 0) <= width:\n        return 0\n    for pct in range(1, _SQUEEZE_MAX_PERCENT + 1):\n        if _text_width_hwpunit(text, size, font, -pct) <= width:\n            return -pct\n    return 0\n\n\ndef _cell_text_centered(doc, cell, text, *, font=FONT_BODY, size, bold=False, color=BLACK, align=\"CENTER\"):\n    _clear_cell(cell)\n    _set_cell_margins(cell)\n    text = str(text)\n    spacing = _choose_letter_spacing(cell, text, font=font, size=size)\n    char_pr_id_ref = _style(doc, font=font, size=size, bold=bold, color=color, letter_spacing=spacing)\n    p = cell.add_paragraph(text, char_pr_id_ref=char_pr_id_ref)\n    if align == \"CENTER\":\n        _center(doc, p)\n    elif align == \"LEFT\":\n        _left(doc, p)\n    _ensure_cell_vertical_center(cell)\n    return p\n\n\ndef _title_band(doc, text):\n    # 새 문서는 빈 문단을 하나 가진 채로 시작한다. doc.add_table(...)은 항상\n    # 새 문단을 \"추가\"해 표를 넣으므로, 그대로 쓰면 제목표 위에 그 빈 문단이\n    # 줄바꿈 한 번으로 남는다. 이 함수는 build_report()에서 가장 먼저\n    # 호출된다고 보고, 그 기존 빈 문단 자체에 표를 넣어 빈 줄을 없앤다.\n    host = doc.paragraphs[0]\n    table = host.add_table(1, 1, height=_mm_to_hwpunits(15))\n    table.set_cell_shading(0, 0, BLUE)\n    table.set_cell_borders(0, 0, color=GRAY_TEXT)\n    _cell_text_centered(doc, table.cell(0, 0), text, font=FONT_HEAD, bold=True, color=WHITE, size=20)\n\n\ndef _section_heading(doc, number, title):\n    sid = _style(doc, font=FONT_HEAD, bold=True, size=15)\n    doc.add_paragraph(f\"{number}. {title}\", char_pr_id_ref=sid)\n\n\ndef _split_trailing_remark(text):\n    \"\"\"끝에 붙은 최상위 괄호 설명(예: '...(날씨 : 맑음)')을 본문과 분리한다.\"\"\"\n    t = text.rstrip()\n    if not t.endswith(\")\"):\n        return text, \"\"\n    depth = 0\n    open_idx = None\n    for i, ch in enumerate(t):\n        if ch == \"(\":\n            if depth == 0:\n                open_idx = i\n            depth += 1\n        elif ch == \")\":\n            depth -= 1\n    if open_idx is None or depth != 0:\n        return text, \"\"\n    return t[:open_idx].rstrip(), t[open_idx:]\n\n\ndef _emphasized_line(doc, text, *, size, prefix=\"\"):\n    \"\"\"prefix(일반) + 본문값(볼드) + 끝 괄호설명(일반) 형태로 한 줄을 구성한다.\"\"\"\n    main, remark = _split_trailing_remark(str(text))\n    sid = _style(doc, size=size)\n    bsid = _style(doc, size=size, bold=True)\n    p = doc.add_paragraph(\"\", char_pr_id_ref=sid, include_run=False)\n    if prefix:\n        p.add_run(prefix, char_pr_id_ref=sid)\n    if main:\n        p.add_run(main, char_pr_id_ref=bsid)\n    if remark:\n        p.add_run((\" \" if main else \"\") + remark, char_pr_id_ref=sid)\n    return p\n\n\ndef _label_line(doc, label, value):\n    _emphasized_line(doc, value, size=15, prefix=f\"□  {label} : \")\n\n\ndef _text_line(doc, text, *, size=12, bold=False, color=BLACK):\n    sid = _style(doc, size=size, bold=bold, color=color)\n    doc.add_paragraph(text, char_pr_id_ref=sid)\n\n\ndef _attachment_header(doc, number, title):\n    table = doc.add_table(1, 2, height=_mm_to_hwpunits(15))\n    # 쪽바꿈을 별도의 빈 문단으로 만들지 않고 표 자신을 담은 문단에 직접\n    # 건다 — 전에는 _page_break()가 빈 문단을 하나 만들고 그 다음 문단에\n    # 표를 넣어서, 매 붙임 제목표 위에 줄바꿈이 하나씩 남았다.\n    # apply_paragraph_format(page_break_before=True)는 paraPr \"스타일\"을\n    # 바꾸는데, 이 스타일이 다른 표(흐름도 등)의 기본 문단과 같은 것으로\n    # 합쳐지면서 관계없는 표 앞에도 쪽바꿈이 번지는 문제가 있었다. hp:p\n    # 자신의 pageBreak 속성(문단 인스턴스 전용, 스타일과 무관)을 직접 켜서\n    # 이 표에만 정확히 쪽바꿈을 건다.\n    table.paragraph.element.set(\"pageBreak\", \"1\")\n    table.set_column_widths([15, 85])\n    table.set_cell_shading(0, 0, GREEN)\n    _cell_text_centered(doc, table.cell(0, 0), f\"붙임 {number}\", font=FONT_HEAD, bold=True, size=20, align=\"CENTER\")\n    _cell_text_centered(doc, table.cell(0, 1), title, font=FONT_HEAD, bold=True, size=20, align=\"LEFT\")\n\n\ndef _equipment_table(doc, equipment):\n    if not equipment:\n        return\n    rows = 1 + len(equipment)\n    table = doc.add_table(rows, 5)\n    table.set_column_widths([24, 21, 14, 12, 19])\n    headers = [\"설비명\", \"규 격\", \"제작년월\", \"제작사\", \"최근 점검년월\"]\n    for j, h in enumerate(headers):\n        table.set_cell_shading(0, j, LIGHT_BLUE)\n        _cell_text_centered(doc, table.cell(0, j), h, font=FONT_TABLE, bold=True, size=14)\n    for i, item in enumerate(equipment, 1):\n        for j, key in enumerate((\"name\", \"spec\", \"made\", \"maker\", \"inspection\")):\n            _cell_text_centered(doc, table.cell(i, j), item.get(key, \"\"), font=FONT_TABLE, bold=True, size=14)\n\n\ndef _flow_table(doc, flow):\n    flow = (list(flow) + [\"\"] * 4)[:4]\n    table = doc.add_table(1, 7)\n    table.set_column_widths([19, 5, 19, 5, 19, 5, 21])\n    box_sid = _style(doc, font=FONT_TABLE, bold=True, size=14)\n    arrow_sid = _style(doc, font=FONT_HEAD, bold=True, size=13, color=ARROW_GRAY)\n    values = [flow[0], \"▶\", flow[1], \"▶\", flow[2], \"▶\", flow[3]]\n    for j, v in enumerate(values):\n        c = table.cell(0, j)\n        _clear_cell(c)\n        _set_cell_margins(c)\n        if j % 2 == 0:\n            table.set_cell_shading(0, j, \"F8F8F8\")\n            table.set_cell_borders(0, j, color=GRAY_TEXT)\n            lines = str(v).split(\"\\n\") if v else [\"\"]\n            for k, line in enumerate(lines):\n                p = c.add_paragraph(line, char_pr_id_ref=box_sid)\n                _center(doc, p)\n        else:\n            p = c.add_paragraph(v, char_pr_id_ref=arrow_sid)\n            _center(doc, p)\n        _ensure_cell_vertical_center(c)\n\n\n# 간이단선도 사진의 최대 박스(mm). 위에 \"고장 파급 흐름\" 표가 이미 자리를\n# 차지하므로 전체 페이지보다 조금 작게 잡는다.\n_DIAGRAM_MAX_W_MM = 170.0\n_DIAGRAM_MAX_H_MM = 180.0\n\n\ndef _diagram_box(doc, placeholder, caption, photo=None):\n    data = (photo or {}).get(\"data\")\n    fmt = (photo or {}).get(\"format\")\n    if data and fmt:\n        data = bytes(data)\n        width_mm, height_mm = _fit_photo_size_mm(data, fmt, _DIAGRAM_MAX_W_MM, _DIAGRAM_MAX_H_MM)\n        doc.add_picture(data, fmt, width_mm=width_mm, height_mm=height_mm, align=\"CENTER\")\n    else:\n        table = doc.add_table(1, 1)\n        table.set_cell_shading(0, 0, \"FAFAFA\")\n        c = table.cell(0, 0)\n        _clear_cell(c)\n        _set_cell_margins(c)\n        sid = _style(doc, font=FONT_TABLE, bold=True, size=14, color=GRAY_TEXT)\n        for line in placeholder.split(\"\\n\"):\n            p = c.add_paragraph(line, char_pr_id_ref=sid)\n            _center(doc, p)\n        _ensure_cell_vertical_center(c)\n    if caption:\n        csid = _style(doc, bold=True, size=15)\n        p = doc.add_paragraph(caption, char_pr_id_ref=csid)\n        _center(doc, p)\n\n\ndef _events_table(doc, events):\n    rows = 1 + max(len(events), 1)\n    table = doc.add_table(rows, 4)\n    table.set_column_widths([23, 40, 12, 25])\n    for j, h in enumerate([\"발생시간\", \"포인트명\", \"상태\", \"비고\"]):\n        table.set_cell_shading(0, j, LIGHT_GRAY)\n        _cell_text_centered(doc, table.cell(0, j), h, font=FONT_TABLE, bold=True, size=14)\n    if events:\n        for i, ev in enumerate(events, 1):\n            vals = [ev.get(\"time\", \"\"), ev.get(\"point\", \"\"), ev.get(\"status\", \"\"), ev.get(\"note\", \"\")]\n            for j, v in enumerate(vals):\n                _cell_text_centered(doc, table.cell(i, j), v, font=FONT_TABLE, bold=True, size=14, align=\"CENTER\")\n    else:\n        _cell_text_centered(doc, table.cell(1, 0), \"\", font=FONT_TABLE, bold=True, size=14)\n\n\ndef _image_dimensions(data, fmt):\n    \"\"\"PNG/JPEG 원본 픽셀 크기를 표준 라이브러리만으로 읽는다(Pyodide 호환).\"\"\"\n    fmt = (fmt or \"\").lower()\n    try:\n        if data[:8] == b\"\\x89PNG\\r\\n\\x1a\\n\" and len(data) >= 24:\n            w = int.from_bytes(data[16:20], \"big\")\n            h = int.from_bytes(data[20:24], \"big\")\n            if w > 0 and h > 0:\n                return w, h\n        elif fmt in (\"jpg\", \"jpeg\") or data[:2] == b\"\\xff\\xd8\":\n            i, n = 2, len(data)\n            while i + 9 < n:\n                if data[i] != 0xFF:\n                    i += 1\n                    continue\n                marker = data[i + 1]\n                if marker == 0xD8 or 0xD0 <= marker <= 0xD7:\n                    i += 2\n                    continue\n                if marker == 0xD9:\n                    break\n                seg_len = int.from_bytes(data[i + 2:i + 4], \"big\")\n                if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,\n                              0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):\n                    h = int.from_bytes(data[i + 5:i + 7], \"big\")\n                    w = int.from_bytes(data[i + 7:i + 9], \"big\")\n                    if w > 0 and h > 0:\n                        return w, h\n                    break\n                i += 2 + seg_len\n    except Exception:\n        pass\n    return None\n\n\n# 사진 한 장을 끼워넣을 수 있는 박스(mm). 원본 비율은 그대로 유지한 채\n# 이 박스 안에 들어오도록 리사이징만 한다(크롭·강제비율 왜곡 없음).\ndef _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm):\n    dims = _image_dimensions(data, fmt)\n    if not dims:\n        return max_w_mm, max_w_mm * 0.75\n    w, h = dims\n    width_mm, height_mm = max_w_mm, max_w_mm * h / w\n    if height_mm > max_h_mm:\n        height_mm = max_h_mm\n        width_mm = max_h_mm * w / h\n    return width_mm, height_mm\n\n\n# 붙임3(현장사진)이 몇 장이든 한 페이지 안에 들어오도록 2열 그리드로 배치하고,\n# 행 수에 맞춰 칸 높이를 동적으로 줄인다. 사진이 1장뿐이면 1열로 크게 보여준다.\n_PHOTO_CONTENT_W_MM = 180.0  # A4에서 좌우 여백(15+15mm)을 뺀 본문 폭\n_PHOTO_PAGE_BUDGET_MM = 235.0  # 붙임3 제목줄 아래, 한 페이지에서 사진 영역이 쓸 수 있는 높이\n_PHOTO_CAPTION_H_MM = 9.0\n_PHOTO_MIN_CELL_H_MM = 40.0\n_PHOTO_MAX_CELL_H_MM = 150.0\n_PHOTO_SINGLE_MAX_W_MM = 170.0\n_PHOTO_SINGLE_MAX_H_MM = 225.0\n\n\ndef _place_photo_in_cell(doc, cell, item, max_w_mm, max_h_mm):\n    _clear_cell(cell)\n    _set_cell_margins(cell)\n    data = item.get(\"data\")\n    fmt = item.get(\"format\")\n    if data and fmt:\n        data = bytes(data)\n        width_mm, height_mm = _fit_photo_size_mm(data, fmt, max_w_mm, max_h_mm)\n        binary_item_id_ref = str(_register_image(doc, data, fmt))\n        p = cell.add_paragraph(\"\")\n        _center(doc, p)\n        p.add_picture(\n            binary_item_id_ref,\n            width=_mm_to_hwpunits(width_mm),\n            height=_mm_to_hwpunits(height_mm),\n            align=\"CENTER\",\n        )\n    else:\n        sid = _style(doc, font=FONT_TABLE, bold=True, size=14, color=ARROW_GRAY)\n        p = cell.add_paragraph(f\"[{item.get('title','현장사진')} 미첨부]\", char_pr_id_ref=sid)\n        _center(doc, p)\n    _ensure_cell_vertical_center(cell)\n\n\ndef _photos_section(doc, photos):\n    photos = list(photos) or [{\"title\": \"현장사진 1\", \"data\": None, \"format\": None}]\n    n = len(photos)\n    cols = 1 if n == 1 else 2\n    rows = -(-n // cols)  # 올림 나눗셈\n\n    if cols == 1:\n        cell_w_mm, cell_h_mm = _PHOTO_SINGLE_MAX_W_MM, _PHOTO_SINGLE_MAX_H_MM\n    else:\n        cell_w_mm = _PHOTO_CONTENT_W_MM / cols - 6.0\n        cell_h_mm = max(\n            _PHOTO_MIN_CELL_H_MM,\n            min(_PHOTO_MAX_CELL_H_MM, _PHOTO_PAGE_BUDGET_MM / rows - _PHOTO_CAPTION_H_MM),\n        )\n\n    table = doc.add_table(rows * 2, cols)\n    table.set_column_widths([1] * cols)\n\n    for idx, item in enumerate(photos):\n        r, c = divmod(idx, cols)\n        cap_row, photo_row = r * 2, r * 2 + 1\n        table.set_cell_shading(cap_row, c, LIGHT_BLUE)\n        _cell_text_centered(doc, table.cell(cap_row, c), item.get(\"title\", \"\"), font=FONT_TABLE, bold=True, size=14)\n        _place_photo_in_cell(doc, table.cell(photo_row, c), item, cell_w_mm, cell_h_mm)\n\n    # 사진 수가 열 수로 나누어떨어지지 않으면 마지막 행에 빈 칸이 남는다 — 빈 칸으로 둔다.\n    remainder = n % cols\n    if remainder:\n        last_cap_row, last_photo_row = (rows - 1) * 2, (rows - 1) * 2 + 1\n        for c in range(remainder, cols):\n            table.cell(last_cap_row, c).set_text(\"\")\n            table.cell(last_photo_row, c).set_text(\"\")\n\n\ndef build_report(data: dict) -> HwpxDocument:\n    doc = HwpxDocument.new()\n    doc.set_page_setup(\n        paper_size=\"A4\", width_mm=210, height_mm=297,\n        margin_left_mm=15, margin_right_mm=15, margin_top_mm=15, margin_bottom_mm=14,\n        header_margin_mm=6, footer_margin_mm=8,\n    )\n\n    incident = data.get(\"incident\", {})\n    title = \"[{}] {} {} 정지 보고\".format(\n        incident.get(\"region\", \"\"), incident.get(\"voltage\", \"\"), incident.get(\"equipment_title\", \"\")\n    )\n    _title_band(doc, title)\n    _blank_line(doc)\n    _section_heading(doc, 1, incident.get(\"overview_title\", \"발생 개요\"))\n    _label_line(doc, \"발생일시\", \"{}  (날씨 : {})\".format(incident.get(\"occurred_at\", \"\"), incident.get(\"weather\", \"\")))\n    _label_line(doc, incident.get(\"equipment_label\", \"정지설비\"), incident.get(\"stopped_equipment\", \"\"))\n    for item in incident.get(\"overview_fields\", []) or []:\n        _label_line(doc, item.get(\"label\", \"\"), item.get(\"value\", \"\"))\n    _equipment_table(doc, incident.get(\"equipment\", []) or [])\n    _label_line(doc, \"계전기 동작\", incident.get(\"relay_operation\", \"\"))\n    _label_line(doc, incident.get(\"cause_label\", \"정지원인\"), incident.get(\"cause\", \"\"))\n    _flow_table(doc, incident.get(\"flow\", [\"1차고장\", \"보호장치 부동작\", \"상위설비 정지\", \"복구\"]))\n\n    _blank_line(doc)\n    _section_heading(doc, 2, incident.get(\"outage_title\", \"정전 현황\"))\n    _text_line(doc, \"□  \" + incident.get(\"outage\", \"\"), size=15)\n\n    _blank_line(doc)\n    _section_heading(doc, 3, \"언론 및 민원 현황\")\n    _text_line(doc, \"□  \" + incident.get(\"media\", \"없음\"), size=15)\n\n    _blank_line(doc)\n    _section_heading(doc, 4, incident.get(\"actions_title\", \"동작 및 조치사항\"))\n    for action in incident.get(\"actions\", []) or []:\n        _emphasized_line(doc, action, size=15, prefix=\"□  \")\n\n    _blank_line(doc)\n    _section_heading(doc, 5, \"향후 계획\")\n    _text_line(doc, \"□  \" + incident.get(\"plan\", \"\"), size=15)\n\n    _attachment_header(doc, 1, incident.get(\"diagram_title\", \"간이 단선도 및 고장 범위\"))\n    _text_line(doc, \"고장 파급 흐름\", size=15, bold=True)\n    _flow_table(doc, incident.get(\"flow\", [\"1차고장\", \"보호장치 부동작\", \"상위설비 정지\", \"복구\"]))\n    _diagram_box(\n        doc,\n        incident.get(\"diagram_placeholder\", \"간이 단선도 삽입 영역\"),\n        incident.get(\"diagram_caption\", \"\"),\n        data.get(\"diagram_photo\"),\n    )\n\n    _attachment_header(doc, 2, \"이벤트 발생 내역\")\n    _events_table(doc, data.get(\"events\", []) or [])\n\n    _attachment_header(doc, 3, \"현장 사진\")\n    _photos_section(doc, data.get(\"photos\", []) or [])\n\n    # 본문(표 밖) 문단 전체 줄간격 200% — 표 셀 안 글씨는 각 셀을 쓸 때\n    # _center/_left가 이미 100%로 적용했다.\n    doc.styles.apply_paragraph_format(line_spacing_percent=200)\n\n    return doc\n\n\n# \"[그림 N]\" 플레이스홀더를 실제 이미지로 바꿀 때 쓰는 확장자→MIME 매핑.\n_PDF_IMAGE_MIME = {\n    \"png\": \"image/png\", \"jpg\": \"image/jpeg\", \"jpeg\": \"image/jpeg\",\n    \"gif\": \"image/gif\", \"bmp\": \"image/bmp\", \"tif\": \"image/tiff\", \"tiff\": \"image/tiff\",\n}\n\ndef render_report_pdf_pages(path):\n    \"\"\"path의 hwpx 파일을 그대로 PDF용 HTML 페이지 조각 리스트로 렌더링한다.\n\n    휴대폰에 HWPX 리더가 없는 사용자를 위한 기능 — 새로 그리는 게 아니라\n    방금 만든 바로 그 hwpx 파일(path)을 hwpx.tools.layout_preview로 읽어\n    페이지별 HTML로 바꾼다. 그 도구는 사진을 \"[그림 N]\" 글자 플레이스홀더로만\n    표시하므로, 같은 hwpx 파일의 BinData에서 실제 이미지 바이트를 읽어\n    data URI로 바꿔 끼워 넣는다. 반환값은 JS 쪽에서 그대로 JSON으로 보낼 수\n    있는 dict: {\"style\": \"<공용 CSS>\", \"pages\": [\"<section>...</section>\", ...]}.\n    \"\"\"\n    import base64\n    import io\n    import re\n    import zipfile\n\n    from hwpx.tools.layout_preview import render_layout_preview\n\n    with open(path, \"rb\") as f:\n        raw = f.read()\n\n    preview = render_layout_preview(raw, mode=\"pages\")\n\n    z = zipfile.ZipFile(io.BytesIO(raw))\n    names = z.namelist()\n    xml_all = \"\".join(\n        z.read(n).decode(\"utf-8\")\n        for n in names\n        if n.startswith(\"Contents/section\") and n.endswith(\".xml\")\n    )\n\n    # 문서에 나온 순서대로 <hc:img binaryItemIDRef=\"...\"> 를 모아, 미리보기\n    # 도구가 \"[그림 1]\", \"[그림 2]\", ... 를 매기는 순서와 맞춘다. (실제\n    # binaryItemIDRef는 <hp:pic> 자신이 아니라 그 안의 <hc:img>에 있다.)\n    refs = re.findall(r'<hc:img\\b[^>]*\\bbinaryItemIDRef=\"([^\"]+)\"', xml_all)\n    images = []\n    for ref in refs:\n        match = next((n for n in names if n.startswith(\"BinData/\" + ref + \".\")), None)\n        if match is None:\n            images.append(None)\n            continue\n        ext = match.rsplit(\".\", 1)[-1].lower()\n        mime = _PDF_IMAGE_MIME.get(ext, \"image/png\")\n        images.append(\"data:\" + mime + \";base64,\" + base64.b64encode(z.read(match)).decode(\"ascii\"))\n\n    counter = {\"i\": 0}\n\n    def _replace_marker(m):\n        idx = counter[\"i\"]\n        counter[\"i\"] += 1\n        if idx < len(images) and images[idx]:\n            return '<img src=\"' + images[idx] + '\" style=\"max-width:100%;max-height:100%;object-fit:contain\" />'\n        return m.group(0)\n\n    marker_re = re.compile(r'<span class=\"hwpx-object-marker\">⟦그림 \\d+⟧</span>')\n    leading_blank_re = re.compile(\n        r'^(<section[^>]*>)<p class=\"hwpx-paragraph hwpx-empty-paragraph\"[^>]*>&nbsp;</p>(?=<table)'\n    )\n\n    pages = []\n    for frag in preview.page_fragments:\n        frag = marker_re.sub(_replace_marker, frag)\n        frag = leading_blank_re.sub(r\"\\1\", frag)\n        pages.append(frag)\n\n    style_match = re.search(r\"<style>(.*?)</style>\", preview.html, flags=re.S)\n    style_css = style_match.group(1) if style_match else \"\"\n    # 공용 CSS에 섞인 html/body 규칙은 뺀다 — 그대로 페이지에 주입하면 앱\n    # 자신의 레이아웃(배경·여백)까지 덮어써 버린다.\n    style_css = re.sub(r\"(?:^|\\s)html\\s*\\{[^}]*\\}\", \"\", style_css)\n    style_css = re.sub(r\"(?:^|\\s)body\\s*\\{[^}]*\\}\", \"\", style_css)\n\n    return {\"style\": style_css, \"pages\": pages}";
 
   var pyodideInstance = null;
   var pyodideReady = false;
 
-  function logStatus(msg, cls){
-    var box = $("genStatus");
+  function logStatus(msg, cls, boxId){
+    var box = $(boxId || "genStatus");
     var line = document.createElement("div");
     if(cls) line.className = cls;
     line.textContent = msg;
     box.appendChild(line);
     box.scrollTop = box.scrollHeight;
   }
-  function clearStatus(){ $("genStatus").innerHTML = ""; }
+  function clearStatus(boxId){ $(boxId || "genStatus").innerHTML = ""; }
 
   async function ensurePyodide(){
     if(pyodideReady) return pyodideInstance;
@@ -1242,43 +1271,63 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
     return pyodideInstance;
   }
 
-  async function generateHwpx(){
-    var btn = $("genBtn");
-    btn.disabled = true;
-    clearStatus();
-    $("genDownload").hidden = true;
-    try{
-      var py = await ensurePyodide();
-      logStatus("입력값 정리 중...");
-      var incident = buildIncident();
-      var events = collectEventRows();
-      var photoRows = collectPhotoRows();
-
-      var dataForJson = {
+  // HWPX 생성과 PDF 생성이 똑같이 쓰는 입력값 수집 + Pyodide 글로벌 업로드.
+  function collectGenerationData(){
+    var incident = buildIncident();
+    var events = collectEventRows();
+    var photoRows = collectPhotoRows();
+    return {
+      photoRows: photoRows,
+      dataForJson: {
         incident: incident,
         events: events,
         photos: photoRows.map(function(p, i){ return { title: p.title, format: p.format, _idx: i }; }),
         diagram_photo: diagramPhotoBytes ? { format: diagramPhotoFormat } : null
-      };
-      py.globals.set("incident_json", JSON.stringify(dataForJson));
-      photoRows.forEach(function(p, i){
-        if(p.data) py.globals.set("photo_bytes_" + i, p.data);
-      });
-      if(diagramPhotoBytes) py.globals.set("diagram_photo_bytes", diagramPhotoBytes);
+      }
+    };
+  }
+  function uploadGenerationData(py, gen){
+    py.globals.set("incident_json", JSON.stringify(gen.dataForJson));
+    gen.photoRows.forEach(function(p, i){
+      if(p.data) py.globals.set("photo_bytes_" + i, p.data);
+    });
+    if(diagramPhotoBytes) py.globals.set("diagram_photo_bytes", diagramPhotoBytes);
+  }
+  // incident_json(+업로드된 사진 바이트)을 읽어 _doc(build_report 결과)까지
+  // 만드는 공통 드라이버 코드. HWPX 저장과 PDF 변환 둘 다 이 뒤에 이어붙인다.
+  var PY_BUILD_DOC_LINES = [
+    "import json",
+    "_data = json.loads(incident_json)",
+    "for _p in _data.get('photos', []):",
+    "    _idx = _p.pop('_idx')",
+    "    _b = globals().get('photo_bytes_' + str(_idx))",
+    "    _p['data'] = bytes(_b.to_py()) if (_b is not None and hasattr(_b, 'to_py')) else None",
+    "_dp = _data.get('diagram_photo')",
+    "if _dp is not None:",
+    "    _db = globals().get('diagram_photo_bytes')",
+    "    _dp['data'] = bytes(_db.to_py()) if (_db is not None and hasattr(_db, 'to_py')) else None",
+    "_doc = build_report(_data)"
+  ].join("\n");
 
-      logStatus("HWPX 문서 조립 중 (파이썬 실행)...");
+  function genFileBaseName(){
+    return (($("assetName").value || "고장보고서").replace(/[\\/:*?"<>|]/g, "_")) + "_" +
+      (($("occurredAt").value || "").slice(0,10) || "draft");
+  }
+
+  async function generateHwpx(){
+    var btn = $("genBtn");
+    btn.disabled = true;
+    clearStatus("genStatus");
+    $("genDownload").hidden = true;
+    try{
+      var py = await ensurePyodide();
+      logStatus("입력값 정리 중...", null, "genStatus");
+      var gen = collectGenerationData();
+      uploadGenerationData(py, gen);
+
+      logStatus("HWPX 문서 조립 중 (파이썬 실행)...", null, "genStatus");
       var driverLines = [
-        "import json",
-        "_data = json.loads(incident_json)",
-        "for _p in _data.get('photos', []):",
-        "    _idx = _p.pop('_idx')",
-        "    _b = globals().get('photo_bytes_' + str(_idx))",
-        "    _p['data'] = bytes(_b.to_py()) if (_b is not None and hasattr(_b, 'to_py')) else None",
-        "_dp = _data.get('diagram_photo')",
-        "if _dp is not None:",
-        "    _db = globals().get('diagram_photo_bytes')",
-        "    _dp['data'] = bytes(_db.to_py()) if (_db is not None and hasattr(_db, 'to_py')) else None",
-        "_doc = build_report(_data)",
+        PY_BUILD_DOC_LINES,
         "_doc.save_to_path('/tmp/_out.hwpx')",
         "with open('/tmp/_out.hwpx', 'rb') as _f:",
         "    _out_bytes = _f.read()",
@@ -1286,7 +1335,7 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
       ].join("\n");
 
       var size = await py.runPythonAsync(PY_BUILDER_SRC + "\n\n" + driverLines);
-      logStatus("문서 생성 완료: " + size + " bytes", "ok");
+      logStatus("문서 생성 완료: " + size + " bytes", "ok", "genStatus");
 
       var outBytesProxy = py.runPython("_out_bytes");
       var outBytes = outBytesProxy.toJs();
@@ -1294,23 +1343,130 @@ footer.hint{font-size:12px;color:var(--ink-faint);text-align:center;margin:var(-
 
       var blob = new Blob([outBytes], {type: "application/octet-stream"});
       var url = URL.createObjectURL(blob);
-      var fileName = (($("assetName").value || "고장보고서").replace(/[\\/:*?"<>|]/g, "_")) + "_" +
-        (($("occurredAt").value || "").slice(0,10) || "draft") + ".hwpx";
+      var fileName = genFileBaseName() + ".hwpx";
       var a = $("genDownloadLink");
       a.href = url;
       a.download = fileName;
       a.textContent = "📄 " + fileName + " 다운로드";
       $("genSizeNote").textContent = Math.round(outBytes.length/1024) + " KB";
       $("genDownload").hidden = false;
-      logStatus("완료! 아래 버튼으로 다운로드하세요.", "ok");
+      logStatus("완료! 아래 버튼으로 다운로드하세요.", "ok", "genStatus");
     }catch(err){
-      logStatus("오류: " + (err && err.message ? err.message : String(err)), "err");
+      logStatus("오류: " + (err && err.message ? err.message : String(err)), "err", "genStatus");
       console.error(err);
     }finally{
       btn.disabled = false;
     }
   }
   $("genBtn").addEventListener("click", generateHwpx);
+
+  // ====================== PDF로 보기·저장 (휴대폰에 HWPX 리더가 없는 경우) ======================
+  // 새로 그리지 않고, 방금 만든 바로 그 hwpx 문서를 hwpx.tools.layout_preview로
+  // 페이지별 HTML로 바꿔 받아온 뒤(사진은 실제 이미지로 끼워서), 그 HTML을
+  // html2canvas로 각 페이지를 이미지로 뜨고 jsPDF로 묶어 진짜 PDF 파일을 만든다.
+  var pdfLibsReady = false;
+
+  function loadExternalScript(src){
+    return new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = function(){ reject(new Error("스크립트 로드 실패: " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensurePdfLibs(){
+    if(pdfLibsReady) return;
+    if(!window.html2canvas){
+      await loadExternalScript("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js");
+    }
+    if(!window.jspdf){
+      await loadExternalScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js");
+    }
+    pdfLibsReady = true;
+  }
+
+  function injectPdfPreviewStyle(css){
+    var tag = document.getElementById("pdfPreviewStyle");
+    if(!tag){
+      tag = document.createElement("style");
+      tag.id = "pdfPreviewStyle";
+      document.head.appendChild(tag);
+    }
+    tag.textContent = css || "";
+  }
+
+  async function generatePdf(){
+    var btn = $("pdfBtn");
+    btn.disabled = true;
+    clearStatus("pdfStatus");
+    $("pdfDownload").hidden = true;
+    try{
+      var py = await ensurePyodide();
+      logStatus("PDF 변환 엔진 불러오는 중...", null, "pdfStatus");
+      await ensurePdfLibs();
+      logStatus("입력값 정리 중...", null, "pdfStatus");
+      var gen = collectGenerationData();
+      uploadGenerationData(py, gen);
+
+      logStatus("HWPX 문서 조립 중 (파이썬 실행)...", null, "pdfStatus");
+      var driverLines = [
+        PY_BUILD_DOC_LINES,
+        "_doc.save_to_path('/tmp/_pdf_src.hwpx')",
+        "import json as _json2",
+        "_json2.dumps(render_report_pdf_pages('/tmp/_pdf_src.hwpx'))"
+      ].join("\n");
+
+      var pagesJson = await py.runPythonAsync(PY_BUILDER_SRC + "\n\n" + driverLines);
+      var pagesData = JSON.parse(pagesJson);
+      logStatus("보고서를 " + pagesData.pages.length + "쪽으로 그리는 중...", null, "pdfStatus");
+
+      injectPdfPreviewStyle(pagesData.style);
+      var pageIds = ["pdfPage1", "pdfPage2", "pdfPage3", "pdfPage4"];
+      pageIds.forEach(function(id, i){ $(id).innerHTML = pagesData.pages[i] || ""; });
+      await new Promise(function(r){ setTimeout(r, 60); });
+
+      var JsPdfCtor = window.jspdf.jsPDF;
+      var pdf = new JsPdfCtor({ unit: "mm", format: "a4" });
+      var pageWidthMm = 210, pageHeightMm = 297;
+      var pageCount = 0;
+      for(var i = 0; i < pageIds.length; i++){
+        if(!pagesData.pages[i]) continue;
+        logStatus("페이지 " + (i + 1) + "/" + pagesData.pages.length + " 이미지로 변환 중...", null, "pdfStatus");
+        var target = $(pageIds[i]).firstElementChild || $(pageIds[i]);
+        var canvas = await window.html2canvas(target, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        var imgData = canvas.toDataURL("image/jpeg", 0.92);
+        var imgHeightMm = canvas.height * pageWidthMm / canvas.width;
+        var drawW = pageWidthMm, drawH = imgHeightMm;
+        if(drawH > pageHeightMm){
+          drawH = pageHeightMm;
+          drawW = canvas.width * pageHeightMm / canvas.height;
+        }
+        var xOff = (pageWidthMm - drawW) / 2;
+        if(pageCount > 0) pdf.addPage();
+        pdf.addImage(imgData, "JPEG", xOff, 0, drawW, drawH);
+        pageCount++;
+      }
+
+      var fileName = genFileBaseName() + ".pdf";
+      var blob = pdf.output("blob");
+      var url = URL.createObjectURL(blob);
+      var a = $("pdfDownloadLink");
+      a.href = url;
+      a.download = fileName;
+      a.textContent = "📄 " + fileName + " 다운로드";
+      $("pdfSizeNote").textContent = Math.round(blob.size / 1024) + " KB";
+      $("pdfDownload").hidden = false;
+      logStatus("완료! 아래 버튼으로 다운로드하거나 바로 열어 확인하세요.", "ok", "pdfStatus");
+    }catch(err){
+      logStatus("오류: " + (err && err.message ? err.message : String(err)), "err", "pdfStatus");
+      console.error(err);
+    }finally{
+      btn.disabled = false;
+    }
+  }
+  $("pdfBtn").addEventListener("click", generatePdf);
 
   // PWA로 https 호스팅된 경우에만 등록됨(file://에서는 브라우저가 서비스워커
   // 등록 자체를 막으므로 조용히 실패해도 앱 동작에는 지장 없음).
